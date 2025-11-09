@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import JournalsList from './pages/JournalsList';
 import JournalView from './pages/JournalView';
+import CalendarConnected from './pages/CalendarConnected';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -9,6 +10,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/calendar-connected" element={<CalendarConnected />} />
         
         <Route
           path="/journals"

@@ -58,6 +58,24 @@ export const reminderAPI = {
   
   getAll: () => 
     api.get('/reminders'),
+  
+  delete: (id) =>
+    api.delete(`/reminders/${id}`),
+  
+  syncToCalendar: (id) =>
+    api.post(`/reminders/${id}/sync-to-calendar`)
+};
+
+// Calendar API
+export const calendarAPI = {
+  getAuthUrl: () =>
+    api.get('/calendar/auth'),
+  
+  getStatus: () =>
+    api.get('/calendar/status'),
+  
+  disconnect: () =>
+    api.post('/calendar/disconnect')
 };
 
 export default api;

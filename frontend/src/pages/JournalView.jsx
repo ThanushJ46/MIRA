@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { journalAPI, reminderAPI } from '../services/api';
+import { journalAPI, reminderAPI, calendarAPI } from '../services/api';
 
 function JournalView() {
   const { id } = useParams();
@@ -13,17 +13,21 @@ function JournalView() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   
-  // Analysis state
   const [analysis, setAnalysis] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   
   // Reminder state
   const [settingReminder, setSettingReminder] = useState(null);
+  
+  // Calendar state
+  const [calendarConnected, setCalendarConnected] = useState(false);
+  const [checkingCalendar, setCheckingCalendar] = useState(true);
 
   useEffect(() => {
     if (!isNew) {
       fetchJournal();
     }
+    checkCalendarStatus();
   }, [id]);
 
   const fetchJournal = async () => {
@@ -39,6 +43,32 @@ function JournalView() {
       setError(err.response?.data?.message || 'Failed to load journal');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkCalendarStatus = async () => {
+    try {
+      const response = await calendarAPI.getStatus();
+      if (response.data.success) {
+        setCalendarConnected(response.data.data.connected);
+      }
+    } catch (err) {
+      console.error('Failed to check calendar status:', err);
+    } finally {
+      setCheckingCalendar(false);
+    }
+  };
+
+  const connectCalendar = async () => {
+    try {
+      const response = await calendarAPI.getAuthUrl();
+      if (response.data.success) {
+        // Open auth URL in new window
+        window.open(response.data.data.authUrl, '_blank');
+        setSuccess('Please complete authorization in the new window');
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to get authorization URL');
     }
   };
 
@@ -98,7 +128,8 @@ function JournalView() {
         journalId: id,
         eventTitle: event.title,
         eventDate: event.date,
-        description: event.description
+        description: event.description || event.sentence,
+        originalSentence: event.sentence
       });
       
       if (proposeResponse.data.success) {
@@ -108,12 +139,40 @@ function JournalView() {
         const confirmResponse = await reminderAPI.confirm(reminderId);
         
         if (confirmResponse.data.success) {
-          setSuccess(`Reminder set for: ${event.title}`);
-          // Remove event from list after setting reminder
-          setAnalysis(prev => ({
-            ...prev,
-            detectedEvents: prev.detectedEvents.filter(e => e !== event)
-          }));
+          // Step 3: If calendar connected, ask to sync
+          if (calendarConnected) {
+            const shouldSync = window.confirm(
+              `Reminder created! Would you like to add "${event.title}" to your Google Calendar?`
+            );
+            
+            if (shouldSync) {
+              try {
+                const syncResponse = await reminderAPI.syncToCalendar(reminderId);
+                if (syncResponse.data.success) {
+                  setSuccess(`Added to Google Calendar: ${event.title}`);
+                  // Remove event from list after syncing
+                  setAnalysis(prev => ({
+                    ...prev,
+                    detectedEvents: prev.detectedEvents.filter(e => e !== event)
+                  }));
+                }
+              } catch (syncErr) {
+                setError(syncErr.response?.data?.message || 'Failed to sync to calendar');
+              }
+            } else {
+              setSuccess(`Reminder set: ${event.title}`);
+              setAnalysis(prev => ({
+                ...prev,
+                detectedEvents: prev.detectedEvents.filter(e => e !== event)
+              }));
+            }
+          } else {
+            setSuccess(`Reminder set: ${event.title} (Connect Google Calendar to sync)`);
+            setAnalysis(prev => ({
+              ...prev,
+              detectedEvents: prev.detectedEvents.filter(e => e !== event)
+            }));
+          }
         }
       }
     } catch (err) {
@@ -134,13 +193,33 @@ function JournalView() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto py-8 px-4">
-        <div className="mb-6">
+        <div className="mb-6 flex justify-between items-center">
           <button
             onClick={() => navigate('/journals')}
             className="text-blue-600 hover:text-blue-800 font-medium"
           >
             ← Back to Journals
           </button>
+          
+          {!checkingCalendar && (
+            <div className="flex items-center gap-2">
+              {calendarConnected ? (
+                <span className="text-sm text-green-600 flex items-center gap-1">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                  </svg>
+                  Google Calendar Connected
+                </span>
+              ) : (
+                <button
+                  onClick={connectCalendar}
+                  className="text-sm px-3 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200"
+                >
+                  📅 Connect Google Calendar
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
