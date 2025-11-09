@@ -5,7 +5,8 @@ const {
   getJournals,
   getJournalById,
   updateJournal,
-  deleteJournal
+  deleteJournal,
+  analyzeJournal
 } = require('../controllers/journalController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -15,5 +16,6 @@ router.get('/', protect, getJournals);
 router.get('/:id', protect, getJournalById);
 router.put('/:id', protect, updateJournal);
 router.delete('/:id', protect, deleteJournal);
+router.post('/:id/analyze', protect, analyzeJournal);
 
 module.exports = router;
