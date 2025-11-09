@@ -18,6 +18,14 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Password is required'],
     minlength: 6
+  },
+  googleRefreshToken: {
+    type: String,
+    default: null
+  },
+  googleAccessToken: {
+    type: String,
+    default: null
   }
 }, {
   timestamps: true  // Automatically adds createdAt and updatedAt

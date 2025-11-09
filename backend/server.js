@@ -7,6 +7,8 @@ const connectDB = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
 const journalRoutes = require('./routes/journalRoutes');
 const meetingRoutes = require('./routes/meetingRoutes');
+const reminderRoutes = require('./routes/reminderRoutes');
+const calendarRoutes = require('./routes/calendarRoutes');
 
 // Initialize Express app
 const app = express();
@@ -35,6 +37,8 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/journals', journalRoutes);
 app.use('/api/meetings', meetingRoutes);
+app.use('/api/reminders', reminderRoutes);
+app.use('/api/calendar', calendarRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
