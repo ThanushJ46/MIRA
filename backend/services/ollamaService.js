@@ -115,7 +115,7 @@ Respond with ONLY a JSON array:
   {
     "title": "Event name",
     "date": "YYYY-MM-DD or 'tomorrow' or 'next Monday'",
-    "time": "HH:MM or null",
+    "time": "10:00am" or "14:30" or "10am" or null (extract exact time mentioned),
     "type": "meeting/appointment/deadline",
     "context": "Exact sentence from journal"
   }
@@ -200,9 +200,35 @@ Return [] if NO future events with specific dates found.`;
 
       // Set time if provided
       if (eventDate && event.time) {
-        const [hours, minutes] = event.time.split(':').map(Number);
-        if (!isNaN(hours) && !isNaN(minutes)) {
-          eventDate.setHours(hours, minutes, 0, 0);
+        let hours = 9;
+        let minutes = 0;
+        
+        const timeStr = event.time.toLowerCase().trim();
+        
+        // Handle various time formats: "10am", "10:00am", "10:30", "14:00"
+        const timeMatch = timeStr.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+        
+        if (timeMatch) {
+          hours = parseInt(timeMatch[1], 10);
+          minutes = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
+          const meridiem = timeMatch[3];
+          
+          // Convert to 24-hour format if AM/PM is specified
+          if (meridiem) {
+            if (meridiem.toLowerCase() === 'pm' && hours < 12) {
+              hours += 12;
+            } else if (meridiem.toLowerCase() === 'am' && hours === 12) {
+              hours = 0;
+            }
+          }
+          
+          if (!isNaN(hours) && !isNaN(minutes) && hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
+            eventDate.setHours(hours, minutes, 0, 0);
+          } else {
+            eventDate.setHours(9, 0, 0, 0); // Default fallback
+          }
+        } else {
+          eventDate.setHours(9, 0, 0, 0); // Default fallback
         }
       } else if (eventDate) {
         // Default to 9 AM if no time specified
