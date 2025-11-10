@@ -36,6 +36,25 @@ function JournalsList() {
     navigate('/login');
   };
 
+  const handleDelete = async (journalId, journalTitle, e) => {
+    e.stopPropagation(); // Prevent navigation when clicking delete
+    
+    if (!window.confirm(`Are you sure you want to delete "${journalTitle || 'Untitled Journal'}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const response = await journalAPI.delete(journalId);
+      if (response.data.success) {
+        // Remove from local state
+        setJournals(journals.filter(j => j._id !== journalId));
+        setError(''); // Clear any previous errors
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to delete journal');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -84,7 +103,7 @@ function JournalsList() {
                   onClick={() => navigate(`/journal/${journal._id}`)}
                 >
                   <div className="flex justify-between items-start">
-                    <div>
+                    <div className="flex-1">
                       <h3 className="text-lg font-semibold text-gray-800 mb-1">
                         {journal.title || 'Untitled Journal'}
                       </h3>
@@ -101,15 +120,24 @@ function JournalsList() {
                         </p>
                       )}
                     </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/journal/${journal._id}`);
-                      }}
-                      className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
-                    >
-                      View
-                    </button>
+                    <div className="flex gap-2 ml-4">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/journal/${journal._id}`);
+                        }}
+                        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                      >
+                        View
+                      </button>
+                      <button
+                        onClick={(e) => handleDelete(journal._id, journal.title, e)}
+                        className="px-4 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200"
+                        title="Delete journal"
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </div>
                 </li>
               ))}

@@ -182,6 +182,27 @@ function JournalView() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm('Are you sure you want to delete this journal? This action cannot be undone.')) {
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await journalAPI.delete(id);
+      if (response.data.success) {
+        setSuccess('Journal deleted successfully!');
+        setTimeout(() => navigate('/journals'), 1000);
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to delete journal');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading && !isNew) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -275,13 +296,23 @@ function JournalView() {
             </button>
 
             {!isNew && (
-              <button
-                onClick={handleAnalyze}
-                disabled={analyzing}
-                className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
-              >
-                {analyzing ? 'Analyzing...' : 'Analyze Journal'}
-              </button>
+              <>
+                <button
+                  onClick={handleAnalyze}
+                  disabled={analyzing}
+                  className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                >
+                  {analyzing ? 'Analyzing...' : 'Analyze Journal'}
+                </button>
+
+                <button
+                  onClick={handleDelete}
+                  disabled={loading}
+                  className="px-6 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 ml-auto"
+                >
+                  🗑️ Delete
+                </button>
+              </>
             )}
           </div>
         </div>
