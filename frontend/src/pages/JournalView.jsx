@@ -27,7 +27,9 @@ function JournalView() {
 
   // Auto-save timer ref
   const autoSaveTimerRef = useRef(null);
+  const autoAnalyzeTimerRef = useRef(null);
   const initialLoadRef = useRef(true);
+  const initialAnalysisLoadRef = useRef(true);
 
   useEffect(() => {
     if (!isNew) {
@@ -75,6 +77,47 @@ function JournalView() {
     };
   }, [title, content]);
 
+  // Auto-analyze effect - triggers 5 seconds after user stops typing
+  useEffect(() => {
+    // Skip auto-analyze on initial load
+    if (initialAnalysisLoadRef.current) {
+      initialAnalysisLoadRef.current = false;
+      return;
+    }
+
+    // Skip auto-analyze for new journals (save manually first)
+    if (isNew) {
+      return;
+    }
+
+    // Skip if no content
+    if (!content.trim()) {
+      return;
+    }
+
+    // Skip if already analyzing
+    if (analyzing) {
+      return;
+    }
+
+    // Clear existing timer
+    if (autoAnalyzeTimerRef.current) {
+      clearTimeout(autoAnalyzeTimerRef.current);
+    }
+
+    // Set new timer for 5 seconds
+    autoAnalyzeTimerRef.current = setTimeout(() => {
+      autoAnalyze();
+    }, 5000);
+
+    // Cleanup on unmount
+    return () => {
+      if (autoAnalyzeTimerRef.current) {
+        clearTimeout(autoAnalyzeTimerRef.current);
+      }
+    };
+  }, [content]); // Only trigger on content changes, not title
+
   const autoSave = async () => {
     if (isNew || !content.trim() || loading || autoSaving) {
       return;
@@ -96,6 +139,29 @@ function JournalView() {
       // Don't show error for auto-save failures to avoid disruption
     } finally {
       setAutoSaving(false);
+    }
+  };
+
+  const autoAnalyze = async () => {
+    if (isNew || !content.trim() || analyzing) {
+      return;
+    }
+
+    setAnalyzing(true);
+    
+    try {
+      const response = await journalAPI.analyze(id);
+      if (response.data.success) {
+        setAnalysis(response.data.data);
+        // Show subtle indicator that auto-analysis completed
+        setSuccess('Analysis updated ✓');
+        setTimeout(() => setSuccess(''), 2000);
+      }
+    } catch (err) {
+      console.error('Auto-analysis failed:', err);
+      // Don't show error for auto-analysis failures to avoid disruption
+    } finally {
+      setAnalyzing(false);
     }
   };
 
@@ -179,7 +245,13 @@ function JournalView() {
       const response = await journalAPI.analyze(id);
       if (response.data.success) {
         setAnalysis(response.data.data);
-        setSuccess('Analysis complete!');
+        // Show success message with auto-reminder info
+        const data = response.data.data;
+        if (data.autoCreatedReminders > 0) {
+          setSuccess(response.data.message || 'Analysis complete with auto-reminders!');
+        } else {
+          setSuccess('Analysis complete!');
+        }
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Analysis failed');
@@ -188,6 +260,9 @@ function JournalView() {
     }
   };
 
+  // handleSetReminder is no longer needed - reminders are auto-created
+  // Keeping this code commented for reference
+  /*
   const handleSetReminder = async (event) => {
     setSettingReminder(event);
     
@@ -250,6 +325,7 @@ function JournalView() {
       setSettingReminder(null);
     }
   };
+  */
 
   const handleDelete = async () => {
     if (!window.confirm('Are you sure you want to delete this journal? This action cannot be undone.')) {
@@ -345,8 +421,9 @@ function JournalView() {
           )}
 
           {success && (
-            <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
-              {success}
+            <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4 flex items-start gap-2">
+              <span className="text-green-600 text-xl">✓</span>
+              <span className="flex-1">{success}</span>
             </div>
           )}
 
@@ -376,7 +453,7 @@ function JournalView() {
             />
             {!isNew && (
               <p className="mt-1 text-xs text-gray-500">
-                💡 Changes are automatically saved after 2 seconds of inactivity
+                💡 Auto-save after 2 seconds • AI analysis after 5 seconds of inactivity
               </p>
             )}
           </div>
@@ -397,7 +474,7 @@ function JournalView() {
                   disabled={analyzing}
                   className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
                 >
-                  {analyzing ? 'Analyzing...' : 'Analyze Journal'}
+                  {analyzing ? 'Analyzing...' : 'Analyze Now'}
                 </button>
 
                 <button
@@ -479,41 +556,54 @@ function JournalView() {
               </div>
             )}
 
-            {/* Detected Events */}
+            {/* Detected Events - Now Auto-Created */}
             {analysis.detectedEvents && analysis.detectedEvents.length > 0 && (
               <div>
-                <h3 className="text-lg font-semibold text-purple-700 mb-2">
+                <h3 className="text-lg font-semibold text-purple-700 mb-2 flex items-center gap-2">
                   📅 Detected Events
+                  <span className="text-sm font-normal text-green-600 bg-green-50 px-2 py-1 rounded">
+                    ✓ Auto-created as reminders
+                  </span>
                 </h3>
                 <div className="space-y-3">
                   {analysis.detectedEvents.map((event, idx) => (
                     <div
                       key={idx}
-                      className="border border-gray-300 rounded-md p-4 flex justify-between items-center"
+                      className="border border-green-200 bg-green-50 rounded-md p-4"
                     >
-                      <div>
-                        <p className="font-medium text-gray-800">{event.title}</p>
-                        {event.date && (
-                          <p className="text-sm text-gray-600">
-                            {new Date(event.date).toLocaleString()}
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-800 flex items-center gap-2">
+                            {event.title}
+                            <span className="text-xs text-green-600 bg-white px-2 py-0.5 rounded border border-green-200">
+                              ✓ Reminder created
+                            </span>
                           </p>
-                        )}
-                        {event.description && (
-                          <p className="text-sm text-gray-500 mt-1">
-                            {event.description}
-                          </p>
-                        )}
+                          {event.date && (
+                            <p className="text-sm text-gray-600 mt-1">
+                              📆 {new Date(event.date).toLocaleString()}
+                            </p>
+                          )}
+                          {event.description && (
+                            <p className="text-sm text-gray-500 mt-1">
+                              💬 {event.description}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <button
-                        onClick={() => handleSetReminder(event)}
-                        disabled={settingReminder === event}
-                        className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50"
-                      >
-                        {settingReminder === event ? 'Setting...' : 'Set Reminder'}
-                      </button>
                     </div>
                   ))}
                 </div>
+                {analysis.autoSyncedToCalendar > 0 && (
+                  <p className="mt-3 text-sm text-green-700 bg-green-100 border border-green-300 rounded px-3 py-2">
+                    🎉 {analysis.autoSyncedToCalendar} event(s) automatically synced to Google Calendar!
+                  </p>
+                )}
+                {analysis.autoCreatedReminders > 0 && analysis.autoSyncedToCalendar === 0 && !calendarConnected && (
+                  <p className="mt-3 text-sm text-blue-700 bg-blue-100 border border-blue-300 rounded px-3 py-2">
+                    💡 Connect Google Calendar to automatically sync events
+                  </p>
+                )}
               </div>
             )}
           </div>
