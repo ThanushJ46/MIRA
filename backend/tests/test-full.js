@@ -1,4 +1,4 @@
-const { analyzeJournalWithLlama, detectEventsWithLlama, checkOllamaAvailability } = require('./services/ollamaService');
+const { analyzeJournalWithLlama, detectEventsWithLlama, checkOllamaAvailability } = require('../services/ollamaService');
 
 async function testFullIntegration() {
   console.log('🔍 Testing Complete Ollama Integration (Analysis + Events)...\n');

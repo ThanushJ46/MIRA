@@ -1,5 +1,5 @@
 // Test semantic understanding with different phrasings
-const { analyzeJournalWithLlama } = require('./services/ollamaService');
+const { analyzeJournalWithLlama } = require('../services/ollamaService');
 
 const testCases = [
   {

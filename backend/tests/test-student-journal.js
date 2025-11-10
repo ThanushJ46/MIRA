@@ -1,4 +1,4 @@
-const { detectEventsWithLlama } = require('./services/ollamaService');
+const { detectEventsWithLlama } = require('../services/ollamaService');
 
 async function testStudentJournal() {
   console.log('🔍 Testing Student Journal Event Detection...\n');

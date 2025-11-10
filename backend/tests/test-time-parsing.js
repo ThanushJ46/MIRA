@@ -1,5 +1,5 @@
 // Test time parsing for dentist appointment
-const { detectEventsWithLlama } = require('./services/ollamaService');
+const { detectEventsWithLlama } = require('../services/ollamaService');
 
 const journalContent = `I also have a dentist appointment tomorrow at 10am.`;
 

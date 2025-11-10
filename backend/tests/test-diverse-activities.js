@@ -1,5 +1,5 @@
 // Test with diverse activities to prove semantic understanding
-const { analyzeJournalWithLlama } = require('./services/ollamaService');
+const { analyzeJournalWithLlama } = require('../services/ollamaService');
 
 const journalContent = `Today was productive! I polished my presentation slides for the client meeting next week. 
 After that, I went through the codebase and fixed several bugs in the authentication module.

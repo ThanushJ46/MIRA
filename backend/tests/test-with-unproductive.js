@@ -1,5 +1,5 @@
 // Test that it DOES detect unproductive activities when mentioned
-const { analyzeJournalWithLlama } = require('./services/ollamaService');
+const { analyzeJournalWithLlama } = require('../services/ollamaService');
 
 const journalContent = `I need to submit my record book day after tomorrow. 
 I wasted 3 hours scrolling through Instagram and TikTok instead of working on it. 

@@ -1,5 +1,5 @@
 // Test strict extraction - should NOT hallucinate activities
-const { analyzeJournalWithLlama } = require('./services/ollamaService');
+const { analyzeJournalWithLlama } = require('../services/ollamaService');
 
 const journalContent = `I need to submit my record book day after tomorrow afternoon. Also have to submit my notes on 15th of this month`;
 

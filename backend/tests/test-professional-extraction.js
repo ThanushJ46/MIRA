@@ -1,5 +1,5 @@
 // Test professional extraction with complex journal
-const { analyzeJournalWithLlama } = require('./services/ollamaService');
+const { analyzeJournalWithLlama } = require('../services/ollamaService');
 
 const journalContent = `Today I completed my mathematics assignment on quadratic equations. 
 I also started working on the research paper about climate change for my environmental science class.
