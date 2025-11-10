@@ -8,30 +8,68 @@ const ollama = require('ollama').default;
  */
 async function analyzeJournalWithLlama(content) {
   try {
-    const prompt = `Analyze this journal entry and respond with ONLY a JSON object, nothing else.
+    const prompt = `You are an expert journal analyzer. Analyze this journal entry and extract meaningful insights.
 
 JOURNAL ENTRY:
 ${content}
 
+Extract and categorize activities with SEMANTIC UNDERSTANDING, not keyword matching.
+
 Respond with this exact JSON structure:
 {
   "productivityScore": <number 0-100>,
-  "productiveActivities": ["activity1", "activity2"],
-  "unproductiveActivities": ["activity1"],
-  "restfulActivities": ["activity1"],
-  "emotionalStates": ["state1", "state2"],
-  "suggestions": ["suggestion1", "suggestion2", "suggestion3"],
-  "overallSentiment": "positive"
+  "productiveActivities": ["clear description of productive task"],
+  "unproductiveActivities": ["clear description of time-wasting activity"],
+  "restfulActivities": ["clear description of rest/relaxation"],
+  "emotionalStates": ["emotion or feeling"],
+  "suggestions": ["actionable suggestion"],
+  "overallSentiment": "positive/neutral/negative"
 }
 
-Rules:
-- productiveActivities: work, study, exercise, learning, creating
-- unproductiveActivities: excessive social media, procrastination
-- restfulActivities: intentional rest, sleep, relaxation
-- emotionalStates: current feelings/moods mentioned
-- suggestions: 3-5 actionable tips
-- overallSentiment: positive/neutral/negative
-- Respond with JSON only, no explanations`;
+EXTRACTION GUIDELINES:
+
+1. PRODUCTIVE ACTIVITIES - Understand the MEANING and CONTEXT:
+   - Tasks with deadlines, assignments, work obligations
+   - Learning, studying, skill development
+   - Exercise, health activities, self-improvement
+   - Creative work, projects, problem-solving
+   - ANY activity that moves toward a goal
+   → Extract the COMPLETE task description naturally as mentioned
+   → Include what they're doing AND what it's about/for
+   → Use their own words and phrasing when possible
+
+2. UNPRODUCTIVE ACTIVITIES - Identify time-wasting patterns:
+   - Activities described as "wasting time", "procrastinating"
+   - Excessive entertainment consumption mentioned negatively
+   - Social media/gaming mentioned as distraction
+   - ONLY if clearly framed as unproductive by the user
+   → Don't assume - they must indicate it was time poorly spent
+
+3. RESTFUL ACTIVITIES - Recognize intentional rest:
+   - Sleep, naps, relaxation
+   - Breaks, leisure time framed positively
+   - Recreation for mental/physical recovery
+   → Only count if framed as deliberate rest, not procrastination
+
+4. EMOTIONAL STATES - Detect feelings from context:
+   - Explicit emotion words (happy, stressed, anxious, motivated)
+   - Implied emotions from tone and word choice
+   - Current mental/emotional state
+
+5. SUGGESTIONS - Provide contextual, personalized advice:
+   - Based on their specific situation
+   - Actionable and practical
+   - Address challenges or optimize their workflow
+   - 3-5 specific recommendations
+
+CRITICAL RULES:
+- Use SEMANTIC understanding, not keyword matching
+- Extract ONLY what's explicitly present in the text
+- Make descriptions complete and professional
+- Empty array [] if nothing found in a category
+- Don't invent or assume activities not mentioned
+
+Respond with ONLY valid JSON, no explanations.`;
 
     const response = await ollama.chat({
       model: 'llama3',
@@ -39,7 +77,7 @@ Rules:
       stream: false,
       format: 'json',
       options: {
-        temperature: 0.2,
+        temperature: 0.15, // Slightly higher for better semantic understanding
       }
     });
 
