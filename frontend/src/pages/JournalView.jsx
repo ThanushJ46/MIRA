@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { journalAPI, reminderAPI, calendarAPI } from '../services/api';
 
@@ -12,6 +12,8 @@ function JournalView() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [autoSaving, setAutoSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
   const [analysis, setAnalysis] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -23,12 +25,79 @@ function JournalView() {
   const [calendarConnected, setCalendarConnected] = useState(false);
   const [checkingCalendar, setCheckingCalendar] = useState(true);
 
+  // Auto-save timer ref
+  const autoSaveTimerRef = useRef(null);
+  const initialLoadRef = useRef(true);
+
   useEffect(() => {
     if (!isNew) {
       fetchJournal();
     }
     checkCalendarStatus();
   }, [id]);
+
+  // Auto-save effect - triggers when title or content changes
+  useEffect(() => {
+    // Skip auto-save on initial load
+    if (initialLoadRef.current) {
+      initialLoadRef.current = false;
+      return;
+    }
+
+    // Skip auto-save for new journals (save manually first)
+    if (isNew) {
+      return;
+    }
+
+    // Skip if no content
+    if (!content.trim()) {
+      return;
+    }
+
+    // Mark as having unsaved changes
+    setHasUnsavedChanges(true);
+
+    // Clear existing timer
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+
+    // Set new timer for 2 seconds
+    autoSaveTimerRef.current = setTimeout(() => {
+      autoSave();
+    }, 2000);
+
+    // Cleanup on unmount
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [title, content]);
+
+  const autoSave = async () => {
+    if (isNew || !content.trim() || loading || autoSaving) {
+      return;
+    }
+
+    setAutoSaving(true);
+    setError('');
+
+    try {
+      const response = await journalAPI.update(id, { title, content });
+      if (response.data.success) {
+        setHasUnsavedChanges(false);
+        // Show brief success indicator
+        setSuccess('Auto-saved ✓');
+        setTimeout(() => setSuccess(''), 1500);
+      }
+    } catch (err) {
+      console.error('Auto-save failed:', err);
+      // Don't show error for auto-save failures to avoid disruption
+    } finally {
+      setAutoSaving(false);
+    }
+  };
 
   const fetchJournal = async () => {
     setLoading(true);
@@ -244,9 +313,30 @@ function JournalView() {
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h1 className="text-2xl font-bold text-gray-800 mb-6">
-            {isNew ? 'New Journal' : 'Edit Journal'}
-          </h1>
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl font-bold text-gray-800">
+              {isNew ? 'New Journal' : 'Edit Journal'}
+            </h1>
+            
+            {/* Auto-save status indicator */}
+            {!isNew && (
+              <div className="text-sm">
+                {autoSaving ? (
+                  <span className="text-blue-600 flex items-center gap-1">
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Saving...
+                  </span>
+                ) : hasUnsavedChanges ? (
+                  <span className="text-orange-600">Unsaved changes</span>
+                ) : (
+                  <span className="text-gray-400">All changes saved</span>
+                )}
+              </div>
+            )}
+          </div>
 
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
@@ -284,15 +374,20 @@ function JournalView() {
               placeholder="Write your journal entry..."
               required
             />
+            {!isNew && (
+              <p className="mt-1 text-xs text-gray-500">
+                💡 Changes are automatically saved after 2 seconds of inactivity
+              </p>
+            )}
           </div>
 
           <div className="flex gap-3">
             <button
               onClick={handleSave}
-              disabled={loading}
+              disabled={loading || autoSaving}
               className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
             >
-              {loading ? 'Saving...' : (isNew ? 'Save' : 'Update')}
+              {loading ? 'Saving...' : (isNew ? 'Create Journal' : 'Save Now')}
             </button>
 
             {!isNew && (
