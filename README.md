@@ -1,38 +1,46 @@
 # MIRA - Mindful Intelligent Reflective Assistant
 
-A modern productivity web application that helps users manage daily journals, track habits, and automatically sync events to Google Calendar with AI-powered insights.
+**An Agentic AI-Powered Journal Application**
 
-## Features
+MIRA is a productivity web application that combines daily journaling with autonomous AI capabilities. The AI agent automatically analyzes your journals, detects events, creates reminders, and syncs them to Google Calendar—all without asking for permission.
 
-- **User Authentication**: JWT-based secure signup/login system with localStorage token management
+## 🤖 Agentic AI Features
+
+- **Autonomous Auto-Save**: Automatically saves journals after 2 seconds of inactivity
+- **Autonomous AI Analysis**: Automatically analyzes journals after 5 seconds using local Llama3 LLM
+- **Autonomous Event Detection**: AI detects events from natural language (meetings, appointments, deadlines)
+- **Autonomous Reminder Creation**: AI creates reminders automatically—no confirmation needed
+- **Autonomous Calendar Sync**: AI syncs events to Google Calendar without asking
+- **Semantic Understanding**: Uses Llama3 for deep semantic analysis, not just keyword matching
+
+## ✨ Core Features
+
+- **User Authentication**: JWT-based secure signup/login system
 - **Daily Journaling**: Create, read, update, and delete journal entries with streak tracking
-- **AI Journal Analysis**: Analyze journal entries using OpenAI GPT to get:
-  - Productivity scores (0-100)
-  - Productive vs unproductive activities breakdown
-  - Personalized improvement suggestions
-  - Automatic event detection from natural language
-- **Smart Event Detection**: Automatically detects events from journal text like:
+- **AI Journal Analysis** (via Ollama Llama3):
+  - Productive, unproductive, and restful activities categorization
+  - Emotional state detection
+  - Personalized suggestions
+  - Overall sentiment analysis
+- **Smart Event Detection**: Detects events from natural language:
   - "I have a meeting tomorrow at 3pm"
-  - "Meeting on 12 of December at 3pm"
-  - "Appointment next Monday at 10am"
-  - "Dentist appointment in 5 days"
+  - "Dentist appointment on December 12 at 10am"
+  - "Submit report by Friday at 5pm"
 - **Google Calendar Integration**: 
   - OAuth 2.0 secure authentication
-  - One-click calendar connection
   - Automatic event sync to Google Calendar
-  - Visual connection status indicator
-- **Smart Reminders**: Propose and confirm reminders from detected events
+  - Connection status indicator
 - **Modern UI**: Beautiful, responsive design with TailwindCSS
 - **Protected Routes**: Automatic redirect to login for unauthenticated users
 
-## Tech Stack
+## 🛠 Tech Stack
 
 **Backend:**
 - Node.js + Express.js
 - MongoDB + Mongoose (Cloud: MongoDB Atlas)
 - JWT Authentication
 - bcryptjs for password hashing
-- OpenAI API (GPT-4 for journal analysis)
+- **Ollama + Llama3** (local LLM for AI analysis)
 - Google Calendar API (OAuth 2.0 + googleapis)
 
 **Frontend:**
@@ -52,7 +60,7 @@ A modern productivity web application that helps users manage daily journals, tr
 │   │   └── db.js                 # MongoDB connection
 │   ├── models/
 │   │   ├── User.js               # User schema with Google tokens
-│   │   ├── Journal.js            # Journal schema
+│   │   ├── Journal.js            # Journal schema with analysis
 │   │   ├── Reminder.js           # Reminder schema with Calendar sync
 │   │   └── Meeting.js            # Meeting schema
 │   ├── routes/
@@ -63,14 +71,15 @@ A modern productivity web application that helps users manage daily journals, tr
 │   │   └── meetingRoutes.js      # Meeting CRUD
 │   ├── controllers/
 │   │   ├── authController.js     # Auth logic
-│   │   ├── journalController.js  # Journal + AI analysis + event detection
-│   │   ├── reminderController.js # Reminder CRUD + Google sync
+│   │   ├── journalController.js  # Journal + AI analysis + auto-reminders
+│   │   ├── reminderController.js # Reminder CRUD
 │   │   ├── calendarController.js # OAuth flow + Calendar API
 │   │   └── meetingController.js  # Meeting logic
+│   ├── services/
+│   │   └── ollamaService.js      # Llama3 AI integration
 │   ├── middleware/
 │   │   └── authMiddleware.js     # JWT protection
 │   ├── .env                      # Environment variables (NOT in git)
-│   ├── .gitignore                # Ignore node_modules, .env
 │   ├── package.json              # Dependencies
 │   └── server.js                 # Main Express server
 │
@@ -81,7 +90,7 @@ A modern productivity web application that helps users manage daily journals, tr
     │   ├── pages/
     │   │   ├── Login.jsx              # Login/Signup page
     │   │   ├── JournalsList.jsx       # Journals list with streak
-    │   │   ├── JournalView.jsx        # Create/view journal + AI analysis
+    │   │   ├── JournalView.jsx        # Journal editor + AI analysis
     │   │   └── CalendarConnected.jsx  # OAuth callback page
     │   ├── services/
     │   │   └── api.js                 # Axios API client with auth
@@ -92,22 +101,41 @@ A modern productivity web application that helps users manage daily journals, tr
     │   └── index.css                  # Tailwind styles
     ├── package.json                   # Dependencies
     ├── tailwind.config.js             # Tailwind config
-    ├── postcss.config.js              # PostCSS config
     └── vite.config.js                 # Vite config
 ```
 
-## Setup Instructions
+## 📋 Setup Instructions
+
+### Prerequisites
+
+**Required:**
+- Node.js (v18 or higher)
+- MongoDB Atlas account (free tier)
+- **Ollama installed locally** with Llama3 model
+- Google Cloud Console account (for Calendar API)
+
+**Install Ollama and Llama3:**
+1. Download Ollama from [https://ollama.ai](https://ollama.ai)
+2. Install and run Ollama
+3. Pull Llama3 model:
+   ```powershell
+   ollama pull llama3
+   ```
+4. Verify it's running:
+   ```powershell
+   ollama list
+   ```
 
 ### Backend Setup
 
-### 1. Install Dependencies
+**1. Install Dependencies**
 
 ```powershell
 cd backend
 npm install
 ```
 
-### 2. Configure Environment Variables
+**2. Configure Environment Variables**
 
 Create `backend/.env` file:
 
@@ -115,79 +143,58 @@ Create `backend/.env` file:
 PORT=5000
 
 # MongoDB Atlas Connection
-MONGO_URI=mongodb+srv://<username>:<password>@<cluster-url>/meeting-assistant?retryWrites=true&w=majority
+MONGO_URI=mongodb+srv://<username>:<password>@<cluster-url>/mira?retryWrites=true&w=majority
 
 # JWT Secret (generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
 JWT_SECRET=your_secure_jwt_secret_here_min_32_characters
 
-# OpenAI API Key (get from https://platform.openai.com/api-keys)
-OPENAI_API_KEY=sk-proj-your_openai_api_key_here
-
-# Google Calendar OAuth 2.0 (get from https://console.cloud.google.com/)
+# Google Calendar OAuth 2.0
 GOOGLE_CLIENT_ID=your_google_client_id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=your_google_client_secret
 GOOGLE_REDIRECT_URI=http://localhost:5000/api/calendar/callback
 ```
 
-**How to get Google Calendar credentials:**
+**Get Google Calendar Credentials:**
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select existing
+2. Create a new project
 3. Enable "Google Calendar API"
 4. Go to "Credentials" → "Create Credentials" → "OAuth 2.0 Client ID"
 5. Application type: Web application
 6. Authorized redirect URIs: `http://localhost:5000/api/calendar/callback`
 7. Copy Client ID and Client Secret to `.env`
 
-### 3. Start MongoDB
-
-MongoDB Atlas is configured - no local MongoDB installation needed!
-
-### 4. Run the Backend Server
+**3. Run Backend Server**
 
 ```powershell
 cd backend
 npm run dev
 ```
 
-Server will run on `http://localhost:5000`
-
-**Backend Dependencies:**
-- express, mongoose, bcryptjs, jsonwebtoken, dotenv, cors
-- openai (for AI analysis)
-- googleapis (for Google Calendar integration)
+Server runs on `http://localhost:5000`
 
 ### Frontend Setup
 
-### 1. Install Dependencies
+**1. Install Dependencies**
 
 ```powershell
 cd frontend
 npm install
 ```
 
-### 2. Run the Frontend
+**2. Run Frontend**
 
 ```powershell
 cd frontend
 npm run dev
 ```
 
-Frontend will run on `http://localhost:5173`
+Frontend runs on `http://localhost:5173`
 
-**Frontend Dependencies:**
-- react, react-dom, react-router-dom
-- axios (API client)
-- tailwindcss, postcss, autoprefixer
-- lucide-react (icons)
+**3. Access Application**
 
-### 3. Access the Application
+Open browser to `http://localhost:5173`
 
-1. Open browser to `http://localhost:5173`
-2. You'll be redirected to `/login`
-3. Create an account or login
-4. Start creating journals and analyzing them!
-
-## API Endpoints
+## 🔌 API Endpoints
 
 ### Authentication
 - `POST /api/auth/signup` - Register new user
@@ -200,19 +207,16 @@ Frontend will run on `http://localhost:5173`
 - `GET /api/journals/:id` - Get specific journal
 - `PUT /api/journals/:id` - Update journal
 - `DELETE /api/journals/:id` - Delete journal
-- `POST /api/journals/:id/analyze` - Analyze journal for productivity insights
+- `POST /api/journals/:id/analyze` - Analyze journal with AI (triggers autonomous features)
 
 ### Reminders
-- `POST /api/reminders/propose` - Propose a new reminder from detected event
-- `POST /api/reminders/:id/confirm` - Confirm and activate a reminder
-- `POST /api/reminders/:id/sync` - Sync reminder to Google Calendar
 - `GET /api/reminders` - Get all user reminders
 - `DELETE /api/reminders/:id` - Delete reminder
 
 ### Google Calendar
 - `GET /api/calendar/auth-url` - Get Google OAuth authorization URL
 - `GET /api/calendar/callback` - OAuth callback handler
-- `GET /api/calendar/status` - Check if user has connected Google Calendar
+- `GET /api/calendar/status` - Check calendar connection status
 - `POST /api/calendar/disconnect` - Disconnect Google Calendar
 
 ### Meetings
@@ -225,169 +229,140 @@ Frontend will run on `http://localhost:5173`
 ### Health Check
 - `GET /api/health` - Check backend status
 
-## Frontend Routes
+## 🌐 Frontend Routes
 
 - `/login` - Login/Signup page (public)
 - `/journals` - List all journals with streak tracking (protected)
 - `/journal/new` - Create new journal entry (protected)
-- `/journal/:id` - View/edit specific journal with AI analysis (protected)
+- `/journal/:id` - View/edit journal with AI analysis (protected)
 - `/calendar-connected` - Google Calendar OAuth callback (protected)
 
-## Authentication
+## 🚀 How It Works (Agentic AI in Action)
 
-All journal and meeting routes require JWT authentication. Include the token in the Authorization header:
+### The Autonomous Workflow:
 
-```
-Authorization: Bearer <your_jwt_token>
-```
+1. **User writes journal** (e.g., "I have a team meeting tomorrow at 3pm")
+2. **Auto-save triggers** after 2 seconds of inactivity
+3. **Auto-analysis triggers** after 5 seconds:
+   - Llama3 analyzes semantic meaning
+   - Categorizes activities (productive/unproductive/restful)
+   - Detects emotional states
+   - Extracts events from natural language
+4. **AI Agent autonomously**:
+   - Creates reminders in database
+   - Syncs events to Google Calendar
+   - Returns analysis results
+5. **User sees results** without clicking anything
 
-## Testing with Postman/API Client
+### Example Analysis Output:
 
-### 1. Signup
-```
-POST http://localhost:5000/api/auth/signup
-Body: { "name": "John Doe", "email": "john@example.com", "password": "password123" }
-```
-
-### 2. Login
-```
-POST http://localhost:5000/api/auth/login
-Body: { "email": "john@example.com", "password": "password123" }
-Response: { "token": "eyJhbGc..." }
-```
-
-### 3. Create Journal (with token)
-```
-POST http://localhost:5000/api/journals/create
-Headers: { "Authorization": "Bearer <your_token>" }
-Body: { "title": "My Day", "content": "I have a meeting tomorrow at 3pm with the team" }
-```
-
-### 4. Analyze Journal
-```
-POST http://localhost:5000/api/journals/:id/analyze
-Headers: { "Authorization": "Bearer <your_token>" }
-Response: { productivity score, activities, suggestions, detected events }
-```
-
-### 5. Get Google Calendar Auth URL
-```
-GET http://localhost:5000/api/calendar/auth-url
-Headers: { "Authorization": "Bearer <your_token>" }
-Response: { "authUrl": "https://accounts.google.com/o/oauth2/v2/auth?..." }
+```json
+{
+  "productive": ["Worked on ML assignment", "Attended AI seminar"],
+  "unproductive": ["Scrolled social media for 2 hours"],
+  "rest": ["30-minute morning jog", "Light reading"],
+  "emotional": ["Energized", "Stressed", "Proud"],
+  "suggestions": [
+    "Consider time-blocking to reduce social media usage",
+    "Maintain exercise routine for stress management"
+  ],
+  "sentiment": "positive",
+  "detectedEvents": [
+    {
+      "title": "Team meeting",
+      "date": "2025-11-11T15:00:00Z",
+      "description": "Discuss final year project"
+    }
+  ],
+  "autoCreatedReminders": 1,
+  "autoSyncedToCalendar": 1
+}
 ```
 
----
+## 📖 Usage Guide
 
-## License
+### 1. First Time Setup
+- Navigate to `http://localhost:5173`
+- Sign up with name, email, and password
+- Login to access journals
 
-MIT License - Feel free to use this project for learning and development.
+### 2. Writing a Journal
+- Click "New Entry"
+- Write naturally: "Had a productive day. Completed the coding assignment. Team standup tomorrow at 10am."
+- **Wait 2 seconds** → Journal auto-saves
+- **Wait 5 more seconds** → AI auto-analyzes
 
-## Contributing
+### 3. Viewing AI Analysis
+- Scroll down to see:
+  - Productive activities
+  - Unproductive activities  
+  - Restful activities
+  - Emotional states
+  - Personalized suggestions
+  - Detected events
+- **No button clicking needed** - agent did everything automatically
 
-Pull requests are welcome! For major changes, please open an issue first to discuss what you would like to change.
+### 4. Connecting Google Calendar (One-time)
+- Click "Connect Google Calendar"
+- Authorize MIRA in Google OAuth screen
+- Future events auto-sync without asking
 
-## Author
-
-Built with ❤️ using React, Node.js, MongoDB, OpenAI, and Google Calendar API
-
----
-
-**MIRA** - *Mindful Intelligent Reflective Assistant*
-
-## Development Notes
-
-- All routes use modular controller pattern for easy maintenance
-- JWT tokens expire in 30 days (configurable)
-- Passwords are hashed with bcrypt (10 salt rounds)
-- MongoDB schemas include timestamps and validation
-- Error handling middleware catches all server errors
-- CORS enabled for frontend integration at localhost:5173
-- Frontend uses localStorage for JWT token persistence
-- Protected routes automatically redirect to login if unauthenticated
-- TailwindCSS provides responsive, utility-first styling
-- Google Calendar uses OAuth 2.0 refresh tokens for persistent access
-- OpenAI GPT-4 analyzes journal entries for productivity insights
-- Event detection uses regex patterns for natural language parsing
-- Supports multiple date formats: relative and absolute
-
-## Security Features
-
-- **JWT Authentication**: Secure token-based auth with httpOnly cookies option
-- **Password Hashing**: bcrypt with salt rounds for secure password storage
-- **Google OAuth 2.0**: Industry-standard OAuth flow for calendar access
-- **Environment Variables**: Sensitive keys stored in .env (not in git)
-- **Protected Routes**: Backend middleware + frontend route guards
-- **Token Refresh**: Google refresh tokens stored securely in MongoDB
-
-## Future Enhancements
-
-- Email notifications for upcoming events
-- Recurring event support
-- Multiple calendar support (Google, Outlook, Apple)
-- Voice-to-text journal entries
-- Mobile app (React Native)
-- Export journals to PDF
-- Share journals with others
-- Advanced analytics dashboard
-- Integration with task management tools
-- Meeting transcription and AI summaries
-
-## Usage Guide
-
-### 1. Create an Account
-- Open http://localhost:5173
-- You'll be redirected to `/login`
-- Click "Sign Up" and create an account with name, email, and password
-
-### 2. Login
-- Enter email and password
-- Token is automatically saved to localStorage
-- Redirected to journals list
-
-### 3. Create a Journal
-- Click "New Entry" button
-- Add optional title and required content
-- Write naturally: "I have a meeting tomorrow at 3pm with the team"
-- Click "Save Journal"
-
-### 4. Analyze Journal with AI
-- Open any saved journal
-- Click "Analyze with AI" button
-- View:
-  - **Productivity Score** (0-100)
-  - **Productive Activities** breakdown
-  - **Unproductive Activities** breakdown
-  - **Personalized Suggestions** for improvement
-  - **Detected Events** from your journal text
-
-### 5. Connect Google Calendar
-- In the journal view, click "Connect Google Calendar" button
-- Authorize MIRA to access your Google Calendar (OAuth 2.0)
-- You'll see a green checkmark when connected
-
-### 6. Sync Events to Google Calendar
-- After analyzing a journal, detected events appear as cards
-- Click "Sync to Google Calendar" on any event
-- Event is automatically added to your Google Calendar
-- Get a confirmation message
-
-### 7. Supported Date Formats
-The AI can detect events in natural language:
+### 5. Supported Natural Language Formats
+The AI understands:
 - **Relative dates**: "tomorrow", "next Monday", "in 5 days"
-- **Absolute dates**: "December 12", "12 of December", "Jan 15th"
+- **Absolute dates**: "December 12", "Nov 15th", "12 of December"
 - **With time**: "at 3pm", "at 10:30am"
-- **Examples**:
-  - "Meeting tomorrow at 3pm"
-  - "Dentist appointment on 12 of December at 10am"
-  - "Team standup next Monday at 9:30am"
-  - "Conference in 10 days"
+- **Complete sentences**: "I have a dentist appointment on Friday at 2pm"
 
-### 8. View Journal Streak
-- Your current streak is displayed in the journals list
-- Maintain daily journaling to increase your streak!
+## 🔒 Security Features
 
-### 9. Logout
-- Click "Logout" button in journals list
-- Token is removed from localStorage
-- Redirected to login page
+- **JWT Authentication**: Secure token-based auth
+- **Password Hashing**: bcrypt with salt rounds
+- **Google OAuth 2.0**: Industry-standard OAuth flow
+- **Environment Variables**: Sensitive keys in .env (not in git)
+- **Protected Routes**: Backend middleware + frontend route guards
+- **Refresh Tokens**: Google tokens stored securely in MongoDB
+
+## 🏗 Architecture Highlights
+
+- **Modular MVC Pattern**: Controllers, routes, models separated
+- **Auto-save/Auto-analyze**: Debounced timers (2s save, 5s analyze)
+- **Llama3 Integration**: Local LLM via Ollama for semantic understanding
+- **Event Detection**: AI-powered semantic NLP (not just regex)
+- **Google Calendar**: Persistent access via OAuth 2.0 refresh tokens
+- **Error Handling**: Centralized error middleware
+- **CORS Enabled**: Secure frontend-backend communication
+
+## 📝 Sample Journals
+
+Check **`sample-journals.md`** for three human-written example journals that demonstrate:
+- Autonomous event detection and reminder creation
+- Productive/unproductive/restful activity categorization
+- Emotional state detection
+- Natural language date/time parsing
+- Calendar sync automation
+
+## 🤝 Contributing
+
+This is an academic Agentic AI project. Contributions welcome for:
+- Improving AI prompt engineering for better analysis
+- Adding more calendar providers (Outlook, Apple Calendar)
+- Enhanced natural language event detection
+- UI/UX improvements
+
+## 📄 License
+
+MIT License - Free to use for learning and development
+
+## 👨‍💻 Author
+
+Built with ❤️ using:
+- **AI**: Ollama + Llama3 (local LLM)
+- **Backend**: Node.js, Express, MongoDB
+- **Frontend**: React, Vite, TailwindCSS
+- **Integrations**: Google Calendar API
+
+---
+
+**MIRA** - *Mindful Intelligent Reflective Assistant*  
+*An Agentic AI system that autonomously manages your productivity*
