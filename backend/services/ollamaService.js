@@ -17,7 +17,6 @@ Extract and categorize activities with SEMANTIC UNDERSTANDING, not keyword match
 
 Respond with this exact JSON structure:
 {
-  "productivityScore": <number 0-100>,
   "productiveActivities": ["clear description of productive task"],
   "unproductiveActivities": ["clear description of time-wasting activity"],
   "restfulActivities": ["clear description of rest/relaxation"],
@@ -97,7 +96,6 @@ Respond with ONLY valid JSON, no explanations.`;
 
     // Validate and normalize
     return {
-      productivityScore: Math.max(0, Math.min(100, analysis.productivityScore || 50)),
       productive: Array.isArray(analysis.productiveActivities) ? analysis.productiveActivities : [],
       unproductive: Array.isArray(analysis.unproductiveActivities) ? analysis.unproductiveActivities : [],
       rest: Array.isArray(analysis.restfulActivities) ? analysis.restfulActivities : [],

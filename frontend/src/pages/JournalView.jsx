@@ -494,26 +494,6 @@ function JournalView() {
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-xl font-bold text-gray-800 mb-4">Analysis Results</h2>
 
-            {/* Productivity Score */}
-            {analysis.productivityScore !== undefined && (
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-700 mb-2">
-                  Productivity Score
-                </h3>
-                <div className="flex items-center">
-                  <div className="w-full bg-gray-200 rounded-full h-4 mr-4">
-                    <div
-                      className="bg-blue-600 h-4 rounded-full"
-                      style={{ width: `${analysis.productivityScore}%` }}
-                    ></div>
-                  </div>
-                  <span className="text-lg font-bold text-gray-800">
-                    {analysis.productivityScore}%
-                  </span>
-                </div>
-              </div>
-            )}
-
             {/* Productive Activities */}
             {analysis.productive && analysis.productive.length > 0 && (
               <div className="mb-6">

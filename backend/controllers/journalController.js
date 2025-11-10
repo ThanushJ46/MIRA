@@ -263,7 +263,6 @@ const analyzeJournal = async (req, res) => {
 
     // Combine analysis with detected events
     const analysis = {
-      productivityScore: aiAnalysis.productivityScore,
       productive: aiAnalysis.productive,
       unproductive: aiAnalysis.unproductive,
       rest: aiAnalysis.rest,
