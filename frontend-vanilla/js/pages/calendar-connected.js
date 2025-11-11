@@ -7,7 +7,8 @@ function renderCalendarConnectedPage() {
   
   if (success) {
     app.innerHTML = `
-      <div class="calendar-success-container">
+      ${renderNavbar()}
+      <div class="calendar-success-container" style="padding-top: 100px;">
         <div class="card calendar-success-card">
           <div class="success-icon">✅</div>
           <h2 class="success-title">Google Calendar Connected!</h2>
@@ -32,7 +33,8 @@ function renderCalendarConnectedPage() {
     }, 1000);
   } else {
     app.innerHTML = `
-      <div class="calendar-success-container">
+      ${renderNavbar()}
+      <div class="calendar-success-container" style="padding-top: 100px;">
         <div class="card calendar-success-card">
           <div class="success-icon">⚠️</div>
           <h2 style="color: #dc2626;">Connection Failed</h2>

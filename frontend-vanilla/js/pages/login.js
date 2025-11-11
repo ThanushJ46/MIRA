@@ -3,6 +3,7 @@ function renderLoginPage() {
   const app = document.getElementById('app');
   
   app.innerHTML = `
+    ${renderNavbar()}
     <div class="login-container">
       <div class="card login-card">
         <h2 class="login-title" id="login-title">AI Journal Login</h2>

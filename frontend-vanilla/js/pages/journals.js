@@ -3,7 +3,8 @@ async function renderJournalsPage() {
   const app = document.getElementById('app');
   
   app.innerHTML = `
-    <div class="container">
+    ${renderNavbar()}
+    <div class="container" style="padding-top: 100px;">
       <div class="journals-header">
         <div>
           <h1 class="journals-title">
@@ -13,7 +14,6 @@ async function renderJournalsPage() {
         </div>
         <div style="display: flex; gap: 12px;">
           <button class="btn btn-primary" id="new-journal-btn">+ New Entry</button>
-          <button class="btn btn-secondary" id="logout-btn">Logout</button>
         </div>
       </div>
 
@@ -76,10 +76,6 @@ async function renderJournalsPage() {
   // Event listeners
   document.getElementById('new-journal-btn').addEventListener('click', () => {
     navigateTo('/journal/new');
-  });
-
-  document.getElementById('logout-btn').addEventListener('click', () => {
-    logout();
   });
 }
 

@@ -14,7 +14,8 @@ async function renderJournalViewPage() {
   const app = document.getElementById('app');
   
   app.innerHTML = `
-    <div class="container">
+    ${renderNavbar()}
+    <div class="container" style="padding-top: 100px;">
       <div class="journal-view-header">
         <h1>${isNew ? 'New Journal Entry' : 'Edit Journal'}</h1>
         <div class="journal-view-actions">

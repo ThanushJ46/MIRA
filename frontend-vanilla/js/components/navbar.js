@@ -1,0 +1,27 @@
+// Reusable Navbar Component
+function renderNavbar() {
+  const isAuth = isAuthenticated();
+  
+  return `
+    <nav class="app-navbar">
+      <div class="navbar-content">
+        <div style="display:flex;align-items:center;gap:12px">
+          <a href="#/" class="navbar-brand-link">
+            <div class="navbar-brand">MIRA</div>
+          </a>
+          <div style="font-size:12px;color:rgba(255,255,255,0.6);font-weight:600">Mindful Intelligent Reflective Assistant</div>
+        </div>
+        <div class="navbar-actions">
+          ${isAuth ? `
+            <a href="#/journals" class="navbar-link">Journals</a>
+            <button class="btn btn-outline btn-sm" onclick="logout()">Logout</button>
+          ` : `
+            <a href="#/login" class="btn btn-outline btn-sm">Log in</a>
+            <a href="#/login" class="btn btn-primary btn-sm">Get Started</a>
+          `}
+        </div>
+      </div>
+    </nav>
+  `;
+}
+

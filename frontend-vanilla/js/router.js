@@ -27,20 +27,24 @@ async function handleRoute() {
   currentPath = path;
 
   // Check if route requires auth
-  const publicRoutes = ['/login', '/calendar-connected'];
-  const isPublicRoute = publicRoutes.includes(path) || path === '/';
+  const publicRoutes = ['/login', '/calendar-connected', '/'];
+  const isPublicRoute = publicRoutes.includes(path);
 
   if (!isPublicRoute && !isAuthenticated()) {
     navigateTo('/login');
     return;
   }
 
-  // Handle root redirect
+  // Handle root - show landing page for unauthenticated, journals for authenticated
   if (path === '/') {
     if (isAuthenticated()) {
       navigateTo('/journals');
     } else {
-      navigateTo('/login');
+      // Show landing page instead of redirecting to login
+      const handler = routes['/'];
+      if (handler) {
+        await handler();
+      }
     }
     return;
   }
