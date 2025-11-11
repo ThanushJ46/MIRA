@@ -133,7 +133,7 @@ function renderLandingPage() {
         </div>
 
         <div style="text-align:right;color:rgba(255,255,255,0.6);font-size:13px">
-          <div>الحمد لله</div>
+         
           <div style="margin-top:6px">Mindful journaling • Autonomous AI</div>
         </div>
       </div>
