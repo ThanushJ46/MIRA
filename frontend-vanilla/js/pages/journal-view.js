@@ -195,12 +195,15 @@ async function renderJournalViewPage() {
 
   // Render analysis results
   function renderAnalysis(analysis) {
-    let html = '<div class="analysis-section"><h2 class="analysis-title">🤖 AI Analysis</h2>';
+    let html = '<div class="analysis-section"><h2 class="analysis-title">🤖 AI Analysis</h2><div class="analysis-grid">';
 
     if (analysis.productive && analysis.productive.length > 0) {
       html += `
-        <div class="analysis-category">
-          <h3 class="analysis-category-title">✅ Productive Activities</h3>
+        <div class="analysis-card analysis-card-productive">
+          <div class="analysis-card-header">
+            <span class="analysis-card-icon">✅</span>
+            <h3 class="analysis-card-title">Productive Activities</h3>
+          </div>
           <ul class="analysis-list">
             ${analysis.productive.map(item => `<li>${item}</li>`).join('')}
           </ul>
@@ -210,8 +213,11 @@ async function renderJournalViewPage() {
 
     if (analysis.unproductive && analysis.unproductive.length > 0) {
       html += `
-        <div class="analysis-category">
-          <h3 class="analysis-category-title">⏰ Unproductive Activities</h3>
+        <div class="analysis-card analysis-card-unproductive">
+          <div class="analysis-card-header">
+            <span class="analysis-card-icon">⏰</span>
+            <h3 class="analysis-card-title">Unproductive Activities</h3>
+          </div>
           <ul class="analysis-list">
             ${analysis.unproductive.map(item => `<li>${item}</li>`).join('')}
           </ul>
@@ -221,8 +227,11 @@ async function renderJournalViewPage() {
 
     if (analysis.rest && analysis.rest.length > 0) {
       html += `
-        <div class="analysis-category">
-          <h3 class="analysis-category-title">😌 Restful Activities</h3>
+        <div class="analysis-card analysis-card-rest">
+          <div class="analysis-card-header">
+            <span class="analysis-card-icon">😌</span>
+            <h3 class="analysis-card-title">Restful Activities</h3>
+          </div>
           <ul class="analysis-list">
             ${analysis.rest.map(item => `<li>${item}</li>`).join('')}
           </ul>
@@ -232,8 +241,11 @@ async function renderJournalViewPage() {
 
     if (analysis.emotional && analysis.emotional.length > 0) {
       html += `
-        <div class="analysis-category">
-          <h3 class="analysis-category-title">💭 Emotional States</h3>
+        <div class="analysis-card analysis-card-emotional">
+          <div class="analysis-card-header">
+            <span class="analysis-card-icon">💭</span>
+            <h3 class="analysis-card-title">Emotional States</h3>
+          </div>
           <ul class="analysis-list">
             ${analysis.emotional.map(item => `<li>${item}</li>`).join('')}
           </ul>
@@ -243,8 +255,11 @@ async function renderJournalViewPage() {
 
     if (analysis.suggestions && analysis.suggestions.length > 0) {
       html += `
-        <div class="analysis-category">
-          <h3 class="analysis-category-title">💡 Suggestions</h3>
+        <div class="analysis-card analysis-card-suggestions">
+          <div class="analysis-card-header">
+            <span class="analysis-card-icon">💡</span>
+            <h3 class="analysis-card-title">Suggestions</h3>
+          </div>
           <ul class="analysis-list">
             ${analysis.suggestions.map(item => `<li>${item}</li>`).join('')}
           </ul>
@@ -254,20 +269,37 @@ async function renderJournalViewPage() {
 
     if (analysis.detectedEvents && analysis.detectedEvents.length > 0) {
       html += `
-        <div class="analysis-category">
-          <h3 class="analysis-category-title">📅 Detected Events</h3>
-          ${analysis.detectedEvents.map(event => `
-            <div class="event-card">
-              <div class="event-card-title">${event.title}</div>
-              <div class="event-card-date">📅 ${new Date(event.date).toLocaleString()}</div>
-              ${event.description ? `<p style="margin-top: 8px; font-size: 14px;">${event.description}</p>` : ''}
-            </div>
-          `).join('')}
+        <div class="analysis-card analysis-card-events">
+          <div class="analysis-card-header">
+            <span class="analysis-card-icon">📅</span>
+            <h3 class="analysis-card-title">Detected Events</h3>
+          </div>
+          <div class="events-list">
+            ${analysis.detectedEvents.map(event => `
+              <div class="event-card">
+                <div class="event-card-title">${event.title}</div>
+                <div class="event-card-date">📅 ${new Date(event.date).toLocaleString()}</div>
+                ${event.description ? `<p class="event-card-description">${event.description}</p>` : ''}
+              </div>
+            `).join('')}
+          </div>
         </div>
       `;
     }
 
-    html += '</div>';
+    if (analysis.sentiment) {
+      html += `
+        <div class="analysis-card analysis-card-sentiment">
+          <div class="analysis-card-header">
+            <span class="analysis-card-icon">${analysis.sentiment === 'positive' ? '😊' : analysis.sentiment === 'negative' ? '😔' : '😐'}</span>
+            <h3 class="analysis-card-title">Overall Sentiment</h3>
+          </div>
+          <div class="sentiment-badge sentiment-${analysis.sentiment}">${analysis.sentiment}</div>
+        </div>
+      `;
+    }
+
+    html += '</div></div>';
     analysisSection.innerHTML = html;
   }
 

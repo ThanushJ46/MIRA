@@ -16,8 +16,8 @@ function renderNavbar() {
             <a href="#/journals" class="navbar-link">Journals</a>
             <button class="btn btn-outline btn-sm" onclick="logout()">Logout</button>
           ` : `
-            <a href="#/login" class="btn btn-outline btn-sm">Log in</a>
-            <a href="#/login" class="btn btn-primary btn-sm">Get Started</a>
+            <button class="btn btn-outline btn-sm" onclick="navigateTo('/login')">Log in</button>
+            <button class="btn btn-primary btn-sm" onclick="navigateTo('/login')">Get Started</button>
           `}
         </div>
       </div>
