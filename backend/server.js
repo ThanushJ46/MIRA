@@ -22,7 +22,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Serve vanilla frontend
+// Serve vanilla frontend (development and production)
 app.use(express.static(path.join(__dirname, '../frontend-vanilla')));
 
 // Health check route
@@ -50,7 +50,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Something went wrong!', error: err.message });
 });
 
-// Serve index.html for all non-API routes (for hash routing)
+// Fallback to index.html for client-side routing
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../frontend-vanilla/index.html'));
 });
@@ -59,5 +59,5 @@ app.get('*', (req, res) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  console.log(`Frontend available at http://localhost:${PORT}`);
+  console.log(`Frontend: http://localhost:${PORT}`);
 });
