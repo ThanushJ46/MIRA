@@ -248,11 +248,12 @@ const analyzeJournal = async (req, res) => {
       });
     }
 
-    // Use Ollama for AI-powered analysis
-    const aiAnalysis = await analyzeJournalWithLlama(content);
-    
-    // Detect events using Llama3
-    const detectedEvents = await detectEventsWithLlama(content);
+    // ⚡ SPEED OPTIMIZATION: Run both Ollama calls in parallel instead of sequential
+    // This cuts analysis time almost in half!
+    const [aiAnalysis, detectedEvents] = await Promise.all([
+      analyzeJournalWithLlama(content),
+      detectEventsWithLlama(content)
+    ]);
 
     // 🤖 AUTONOMOUS AGENT: Auto-create reminders and sync to calendar
     let autoCreatedReminders = [];
