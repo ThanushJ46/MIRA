@@ -366,9 +366,207 @@ async function checkOllamaAvailability() {
   }
 }
 
+/**
+ * AI Agent: Intelligently decide which reminders to create and how to structure them
+ * This is TRUE AGENTIC AI - the AI makes autonomous decisions about reminder creation
+ * @param {Array} detectedEvents - Events detected from journal
+ * @param {string} journalContent - Original journal content for context
+ * @returns {Promise<Array>} - AI-generated reminder objects ready for database
+ */
+async function createRemindersWithAI(detectedEvents, journalContent) {
+  try {
+    if (!detectedEvents || detectedEvents.length === 0) {
+      console.log('ℹ️ No events to analyze for reminder creation');
+      return [];
+    }
+
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🤖 AGENTIC AI REMINDER CREATION STARTED');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(`📥 Input: ${detectedEvents.length} detected events`);
+    console.log('📋 Events to analyze:', JSON.stringify(detectedEvents.map(e => ({
+      title: e.title,
+      date: e.date,
+      type: e.type
+    })), null, 2));
+    console.log('🧠 Sending to Llama3 AI for intelligent decision-making...');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+    const prompt = `You are an intelligent reminder creation agent. Analyze these detected events and decide which ones should become reminders.
+
+DETECTED EVENTS:
+${JSON.stringify(detectedEvents, null, 2)}
+
+JOURNAL CONTEXT:
+${journalContent.substring(0, 500)}
+
+YOUR TASK:
+Analyze each event and decide if it needs a reminder. For approved events, create enhanced reminder objects.
+
+DECISION RULES:
+✓ CREATE if: Appointment, deadline, meeting, important commitment
+✗ SKIP if: Casual mention, vague idea, already passed, uncertain ("maybe", "might")
+
+OUTPUT FORMAT (MUST BE VALID JSON ARRAY):
+[
+  {
+    "title": "Event name",
+    "description": "Context from journal + preparation notes",
+    "eventDate": "YYYY-MM-DDTHH:mm:ss.sssZ",
+    "shouldCreate": true,
+    "priority": "high",
+    "aiReasoning": "Why this needs a reminder",
+    "preparationNotes": "What to prepare"
+  }
+]
+
+CRITICAL RULES:
+1. Return ONLY valid JSON array (no markdown, no explanations)
+2. Only include events where shouldCreate is true
+3. Use exact ISO date from detected event
+4. Be selective - quality over quantity
+5. Empty array [] if no events deserve reminders
+
+Respond with JSON array only:`;
+
+    console.log('⏳ Waiting for Llama3 AI response...');
+    
+    const response = await ollama.chat({
+      model: 'llama3',
+      messages: [{ role: 'user', content: prompt }],
+      stream: false,
+      format: 'json',
+      options: {
+        temperature: 0.2, // Lower temperature for more consistent output
+        num_predict: 1000, // Limit response length
+      }
+    });
+
+    const messageContent = response.message.content.trim();
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🤖 AI RESPONSE RECEIVED');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📤 Raw AI output (first 500 chars):', messageContent.substring(0, 500));
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    // Extract JSON - handle markdown code blocks
+    let jsonString = messageContent;
+    if (messageContent.includes('```json')) {
+      const match = messageContent.match(/```json\s*([\s\S]*?)\s*```/);
+      if (match) jsonString = match[1].trim();
+    } else if (messageContent.includes('```')) {
+      const match = messageContent.match(/```\s*([\s\S]*?)\s*```/);
+      if (match) jsonString = match[1].trim();
+    }
+
+    // Try to parse JSON
+    let aiReminders;
+    try {
+      aiReminders = JSON.parse(jsonString);
+    } catch (parseError) {
+      console.error('❌ JSON parse error:', parseError.message);
+      console.error('Failed JSON string:', jsonString.substring(0, 300));
+      
+      // Fallback: Create basic reminders from all detected events
+      console.log('⚠️ Falling back to basic reminder creation');
+      return detectedEvents.map(event => ({
+        title: event.title,
+        description: event.description || event.sentence || 'Event from journal',
+        eventDate: new Date(event.date),
+        originalSentence: event.sentence || ''
+      }));
+    }
+    
+    // Validate response is an array
+    if (!Array.isArray(aiReminders)) {
+      console.error('❌ AI returned non-array response:', typeof aiReminders);
+      console.error('Response structure:', JSON.stringify(aiReminders).substring(0, 200));
+      
+      // Check if it's wrapped in an object with a key
+      if (aiReminders && typeof aiReminders === 'object') {
+        // Try common wrapper keys
+        const possibleKeys = ['reminders', 'events', 'items', 'data', 'results'];
+        for (const key of possibleKeys) {
+          if (Array.isArray(aiReminders[key])) {
+            console.log(`✅ Found array under key "${key}"`);
+            aiReminders = aiReminders[key];
+            break;
+          }
+        }
+      }
+      
+      // If still not an array, fallback
+      if (!Array.isArray(aiReminders)) {
+        console.log('⚠️ Falling back to basic reminder creation');
+        return detectedEvents.map(event => ({
+          title: event.title,
+          description: event.description || event.sentence || 'Event from journal',
+          eventDate: new Date(event.date),
+          originalSentence: event.sentence || ''
+        }));
+      }
+    }
+
+    // Filter: Only keep reminders where AI decided shouldCreate is true
+    const approvedReminders = aiReminders.filter(reminder => reminder.shouldCreate === true);
+
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🤖 AI DECISION COMPLETE');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(`📊 AI analyzed: ${detectedEvents.length} events`);
+    console.log(`✅ AI approved: ${approvedReminders.length} reminders`);
+    console.log(`❌ AI rejected: ${detectedEvents.length - approvedReminders.length} events`);
+    
+    if (approvedReminders.length > 0) {
+      console.log('\n📝 AI-APPROVED REMINDERS:');
+      approvedReminders.forEach((reminder, index) => {
+        console.log(`\n${index + 1}. "${reminder.title}"`);
+        console.log(`   📅 Date: ${reminder.eventDate}`);
+        console.log(`   🎯 Priority: ${reminder.priority}`);
+        console.log(`   💭 AI Reasoning: ${reminder.aiReasoning}`);
+      });
+    }
+
+    if (approvedReminders.length === 0) {
+      console.log('ℹ️ AI decided NO events need reminders (all were casual mentions or uncertain)');
+    }
+    
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('✨ This was 100% AI decision-making, not backend code!');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+
+    // Transform AI response into database-ready format
+    return approvedReminders.map(reminder => ({
+      title: reminder.title,
+      description: reminder.description || reminder.preparationNotes || '',
+      eventDate: new Date(reminder.eventDate),
+      originalSentence: reminder.aiReasoning || '',
+      aiMetadata: {
+        priority: reminder.priority || 'medium',
+        reasoning: reminder.aiReasoning,
+        preparationNotes: reminder.preparationNotes
+      }
+    }));
+
+  } catch (error) {
+    console.error('❌ AI reminder creation error:', error);
+    console.error('Error stack:', error.stack);
+    
+    // Fallback: Create basic reminders from detected events
+    console.log('⚠️ Error fallback: Creating basic reminders from all detected events');
+    return detectedEvents.map(event => ({
+      title: event.title,
+      description: event.description || event.sentence || '',
+      eventDate: new Date(event.date),
+      originalSentence: event.sentence || ''
+    }));
+  }
+}
+
 module.exports = {
   analyzeJournalWithLlama,
   detectEventsWithLlama,
   generateSuggestionsWithLlama,
-  checkOllamaAvailability
+  checkOllamaAvailability,
+  createRemindersWithAI  // NEW: AI-powered reminder creation
 };

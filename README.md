@@ -9,9 +9,10 @@ MIRA is a personal journaling web application that uses a local AI model (Llama3
 - **Auto-Save**: Automatically saves journals 2 seconds after you stop typing
 - **Auto-Analysis**: Automatically analyzes journals 5 seconds after you stop typing using local Llama3 LLM
 - **Semantic Event Detection**: AI detects future events from natural language (meetings, appointments, deadlines)
-- **Autonomous Reminder Creation**: AI automatically creates reminders from detected events—no manual confirmation needed
-- **Automatic Calendar Sync**: If Google Calendar is connected, reminders auto-sync without asking
+- **🤖 Agentic AI Reminder Creation**: **Llama3 AI intelligently decides** which events need reminders and autonomously creates them with enhanced descriptions and context
+- **Automatic Calendar Sync**: If Google Calendar is connected, AI-created reminders auto-sync without asking
 - **Semantic Understanding**: Uses Llama3 for deep semantic analysis, not keyword matching
+- **AI Decision Making**: AI agent autonomously decides reminder priority, adds preparation notes, and filters out casual mentions
 
 ## ✨ Core Features
 
@@ -250,7 +251,7 @@ All routes automatically redirect to `#/login` if user is not authenticated.
 
 ## 🚀 How It Works (AI Workflow)
 
-### The Autonomous Workflow:
+### The Agentic AI Workflow:
 
 1. **User writes journal** (e.g., "I have a team meeting tomorrow at 3pm to discuss the final year project")
 2. **Auto-save triggers** after 2 seconds of inactivity → saves to MongoDB
@@ -258,11 +259,48 @@ All routes automatically redirect to `#/login` if user is not authenticated.
    - Two parallel AI calls to Llama3 (50% faster than sequential):
      - Call 1: Analyze activities, emotions, sentiment
      - Call 2: Detect future events with specific dates
-4. **AI Agent autonomously**:
-   - Creates reminders in database (auto-confirmed)
-   - If Google Calendar connected → syncs events to calendar
-   - Returns complete analysis results
+4. **🤖 Agentic AI Decision-Making**:
+   - **Third AI call**: Llama3 analyzes detected events and makes intelligent decisions:
+     - Decides which events truly need reminders (filters out casual mentions)
+     - Creates enhanced descriptions with context from the journal
+     - Adds preparation notes and suggestions
+     - Assigns priority levels (high/medium/low)
+     - Provides reasoning for each decision
+   - Creates approved reminders in database
+   - If Google Calendar connected → syncs AI-approved reminders to calendar
 5. **User sees results** displayed below journal editor—no button clicking needed
+
+### Example of AI Decision-Making:
+
+**Detected Events (from event detection):**
+```json
+[
+  {"title": "Team meeting", "date": "2025-11-12T15:00:00Z"},
+  {"title": "Maybe grab coffee", "date": "2025-11-13T10:00:00Z"}
+]
+```
+
+**AI Agent Decision (createRemindersWithAI):**
+```json
+[
+  {
+    "title": "Team standup meeting",
+    "description": "Discuss sprint progress and final year project. Be prepared with your status update.",
+    "eventDate": "2025-11-12T15:00:00Z",
+    "shouldCreate": true,
+    "priority": "high",
+    "aiReasoning": "This is a confirmed work commitment that requires preparation",
+    "preparationNotes": "Review sprint progress, prepare status update for final year project discussion"
+  },
+  {
+    "title": "Maybe grab coffee",
+    "shouldCreate": false,
+    "aiReasoning": "Casual mention with uncertainty ('maybe'), not a firm commitment"
+  }
+]
+```
+
+**Result**: AI creates 1 reminder (approved), skips 1 (too casual)
 
 ### Example Analysis Output:
 
@@ -375,8 +413,11 @@ The AI understands various date/time expressions:
 **AI Analysis Speed (with GPU - RTX 4050):**
 - Journal semantic analysis: ~3-5 seconds
 - Event detection: ~2-3 seconds
-- **Parallel execution**: Both run simultaneously → total ~5 seconds (not 8 seconds)
-- Temperature: 0.15 for precise extraction
+- **AI reminder decision-making**: ~2-4 seconds
+- **Parallel execution**: Analysis + Event Detection run simultaneously → ~5 seconds
+- **Sequential**: Then AI decides on reminders → +2-4 seconds
+- **Total**: ~7-9 seconds for complete AI workflow (analysis + event detection + intelligent reminder creation)
+- Temperature: 0.15 for analysis, 0.3 for reminder decisions (more consistent decision-making)
 
 **Without Ollama Running:**
 - Returns 503 error: "Ollama service not available. Please ensure Ollama is running and llama3 model is installed."
@@ -392,9 +433,11 @@ The AI understands various date/time expressions:
 
 - **Modular MVC Pattern**: Controllers, routes, models cleanly separated
 - **Auto-save/Auto-analyze**: Debounced timers prevent excessive API calls
-- **Parallel AI Calls**: Promise.all() runs both Llama3 analyses simultaneously (50% faster)
+- **Parallel AI Calls**: Promise.all() runs analysis + event detection simultaneously (50% faster)
+- **🤖 Agentic AI**: Third sequential AI call makes intelligent decisions about reminder creation
 - **Llama3 Integration**: Local LLM via Ollama for complete privacy—no data sent to external APIs
 - **Semantic NLP**: Deep language understanding, not regex or keyword matching
+- **AI Decision Engine**: Llama3 filters events, assigns priorities, adds context, and decides what needs reminders
 - **Event Detection**: AI-powered date/time parsing with relative date conversion
 - **Google Calendar**: Persistent access via OAuth 2.0 refresh tokens (stored per-user)
 - **Error Handling**: Try-catch blocks with user-friendly error messages
@@ -415,9 +458,11 @@ The AI understands various date/time expressions:
 - ✅ Personalized suggestions (3-5 recommendations)
 - ✅ Overall sentiment analysis
 - ✅ Future event detection from natural language
-- ✅ Autonomous reminder creation (auto-confirmed)
+- ✅ **🤖 Agentic AI Reminder Creation** - Llama3 intelligently decides which reminders to create
+- ✅ **AI Decision-Making** - Filters casual mentions, assigns priorities, adds context
+- ✅ **AI-Enhanced Descriptions** - Adds preparation notes and reasoning
 - ✅ Google Calendar OAuth 2.0 connection
-- ✅ Automatic calendar sync for detected events
+- ✅ Automatic calendar sync for AI-approved reminders
 - ✅ Manual reminder deletion
 - ✅ Calendar connection status indicator
 - ✅ Calendar disconnect functionality

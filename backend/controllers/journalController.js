@@ -5,110 +5,86 @@ const { google } = require('googleapis');
 const { 
   analyzeJournalWithLlama, 
   detectEventsWithLlama, 
-  checkOllamaAvailability 
+  checkOllamaAvailability,
+  createRemindersWithAI  // NEW: AI-powered reminder creation
 } = require('../services/ollamaService');
 
-// Helper function to automatically create reminders and sync to calendar
-const autoCreateAndSyncReminders = async (userId, journalId, detectedEvents) => {
+// Helper function to sync AI-created reminders to Google Calendar
+const syncRemindersToCalendar = async (userId, aiReminders) => {
   try {
-    const createdReminders = [];
+    const syncResults = [];
     
     // Get user to check if they have Google Calendar connected
     const user = await User.findById(userId);
     const hasCalendar = !!user.googleRefreshToken;
 
-    for (const event of detectedEvents) {
+    if (!hasCalendar) {
+      console.log('ℹ️ No Google Calendar connected, skipping sync');
+      return syncResults;
+    }
+
+    // Create OAuth2 client
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI
+    );
+
+    oauth2Client.setCredentials({
+      refresh_token: user.googleRefreshToken
+    });
+
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    for (const reminderData of aiReminders) {
       try {
-        // Step 1: Create and confirm reminder automatically
-        const reminder = await Reminder.create({
-          userId: userId,
-          journalId: journalId,
-          title: event.title,
-          description: event.description || event.sentence || '',
-          eventDate: new Date(event.date),
-          originalSentence: event.sentence || event.description || '',
-          status: 'confirmed' // Auto-confirm instead of 'proposed'
+        // Create calendar event
+        const calendarEvent = {
+          summary: reminderData.title,
+          description: reminderData.description || reminderData.aiMetadata?.preparationNotes || 'From MIRA Journal',
+          start: {
+            dateTime: reminderData.eventDate.toISOString(),
+            timeZone: 'UTC',
+          },
+          end: {
+            dateTime: new Date(reminderData.eventDate.getTime() + 60 * 60 * 1000).toISOString(), // 1 hour duration
+            timeZone: 'UTC',
+          },
+          reminders: {
+            useDefault: false,
+            overrides: [
+              { method: 'popup', minutes: 30 },
+              { method: 'email', minutes: 60 },
+            ],
+          },
+        };
+
+        const response = await calendar.events.insert({
+          calendarId: 'primary',
+          resource: calendarEvent,
         });
 
-        // Step 2: If user has Google Calendar, auto-sync
-        if (hasCalendar) {
-          try {
-            // Create OAuth2 client
-            const oauth2Client = new google.auth.OAuth2(
-              process.env.GOOGLE_CLIENT_ID,
-              process.env.GOOGLE_CLIENT_SECRET,
-              process.env.GOOGLE_REDIRECT_URI
-            );
+        syncResults.push({
+          title: reminderData.title,
+          synced: true,
+          calendarEventId: response.data.id,
+          calendarLink: response.data.htmlLink
+        });
 
-            oauth2Client.setCredentials({
-              refresh_token: user.googleRefreshToken
-            });
-
-            const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
-
-            // Create calendar event
-            const calendarEvent = {
-              summary: reminder.title,
-              description: reminder.description || `From MIRA Journal\n${reminder.originalSentence}`,
-              start: {
-                dateTime: reminder.eventDate.toISOString(),
-                timeZone: 'UTC',
-              },
-              end: {
-                dateTime: new Date(reminder.eventDate.getTime() + 60 * 60 * 1000).toISOString(), // 1 hour duration
-                timeZone: 'UTC',
-              },
-              reminders: {
-                useDefault: false,
-                overrides: [
-                  { method: 'popup', minutes: 30 },
-                  { method: 'email', minutes: 60 },
-                ],
-              },
-            };
-
-            const response = await calendar.events.insert({
-              calendarId: 'primary',
-              resource: calendarEvent,
-            });
-
-            // Update reminder with Google Calendar event ID
-            reminder.googleCalendarEventId = response.data.id;
-            reminder.status = 'synced';
-            await reminder.save();
-
-            createdReminders.push({
-              reminder,
-              synced: true,
-              calendarLink: response.data.htmlLink
-            });
-
-            console.log(`✅ Auto-synced to calendar: ${event.title}`);
-          } catch (syncError) {
-            console.error(`Failed to sync "${event.title}" to calendar:`, syncError.message);
-            // Still add to reminders even if calendar sync fails
-            createdReminders.push({
-              reminder,
-              synced: false,
-              error: syncError.message
-            });
-          }
-        } else {
-          // No calendar connected, just create reminder
-          createdReminders.push({
-            reminder,
-            synced: false,
-            reason: 'No Google Calendar connected'
-          });
-        }
-      } catch (reminderError) {
-        console.error(`Failed to create reminder for "${event.title}":`, reminderError.message);
+        console.log(`✅ AI reminder synced to calendar: ${reminderData.title}`);
+      } catch (syncError) {
+        console.error(`Failed to sync "${reminderData.title}" to calendar:`, syncError.message);
+        syncResults.push({
+          title: reminderData.title,
+          synced: false,
+          error: syncError.message
+        });
       }
     }
 
-    return createdReminders;
+    return syncResults;
   } catch (error) {
-    console.error('Auto-create reminders error:', error);
+    console.error('Calendar sync error:', error);
     return [];
   }
 };
@@ -255,11 +231,53 @@ const analyzeJournal = async (req, res) => {
       detectEventsWithLlama(content)
     ]);
 
-    // 🤖 AUTONOMOUS AGENT: Auto-create reminders and sync to calendar
-    let autoCreatedReminders = [];
+    // 🤖 AGENTIC AI: Let AI intelligently decide which reminders to create
+    let createdReminders = [];
+    let syncResults = [];
+    
     if (detectedEvents && detectedEvents.length > 0) {
-      console.log(`🤖 Agent detected ${detectedEvents.length} events, auto-creating reminders...`);
-      autoCreatedReminders = await autoCreateAndSyncReminders(req.userId, req.params.id, detectedEvents);
+      console.log(`🤖 AI Agent: Detected ${detectedEvents.length} potential events`);
+      
+      // NEW: AI makes intelligent decisions about reminder creation
+      const aiReminders = await createRemindersWithAI(detectedEvents, content);
+      console.log(`🤖 AI Agent: Approved ${aiReminders.length} reminders for creation`);
+      
+      if (aiReminders.length > 0) {
+        // Save AI-approved reminders to database
+        for (const reminderData of aiReminders) {
+          try {
+            const reminder = await Reminder.create({
+              userId: req.userId,
+              journalId: req.params.id,
+              title: reminderData.title,
+              description: reminderData.description,
+              eventDate: reminderData.eventDate,
+              originalSentence: reminderData.originalSentence || reminderData.aiMetadata?.reasoning || '',
+              status: 'confirmed' // AI auto-confirms
+            });
+            
+            createdReminders.push(reminder);
+            console.log(`✅ AI-created reminder: ${reminder.title}`);
+          } catch (dbError) {
+            console.error(`Failed to save AI reminder "${reminderData.title}":`, dbError.message);
+          }
+        }
+        
+        // Sync AI-created reminders to Google Calendar
+        syncResults = await syncRemindersToCalendar(req.userId, aiReminders);
+        
+        // Update reminder status for successfully synced items
+        for (const syncResult of syncResults) {
+          if (syncResult.synced && syncResult.calendarEventId) {
+            const reminder = createdReminders.find(r => r.title === syncResult.title);
+            if (reminder) {
+              reminder.googleCalendarEventId = syncResult.calendarEventId;
+              reminder.status = 'synced';
+              await reminder.save();
+            }
+          }
+        }
+      }
     }
 
     // Combine analysis with detected events
@@ -271,8 +289,9 @@ const analyzeJournal = async (req, res) => {
       suggestions: aiAnalysis.suggestions,
       sentiment: aiAnalysis.sentiment,
       detectedEvents: detectedEvents,
-      autoCreatedReminders: autoCreatedReminders.length, // Count of reminders created
-      autoSyncedToCalendar: autoCreatedReminders.filter(r => r.synced).length // Count synced
+      aiRemindersCreated: createdReminders.length, // AI-approved and created
+      autoSyncedToCalendar: syncResults.filter(r => r.synced).length, // Count synced
+      aiDecisionMaking: true // Flag indicating AI made autonomous decisions
     };
 
     // Save analysis to journal
@@ -283,12 +302,12 @@ const analyzeJournal = async (req, res) => {
 
     // Enhanced success message
     let message = "Journal analyzed successfully with AI";
-    if (autoCreatedReminders.length > 0) {
-      const syncedCount = autoCreatedReminders.filter(r => r.synced).length;
+    if (createdReminders.length > 0) {
+      const syncedCount = syncResults.filter(r => r.synced).length;
       if (syncedCount > 0) {
-        message += ` • ${autoCreatedReminders.length} reminder(s) created • ${syncedCount} synced to Google Calendar`;
+        message += ` • AI created ${createdReminders.length} reminder(s) • ${syncedCount} synced to Google Calendar`;
       } else {
-        message += ` • ${autoCreatedReminders.length} reminder(s) created`;
+        message += ` • AI created ${createdReminders.length} reminder(s)`;
       }
     }
 
