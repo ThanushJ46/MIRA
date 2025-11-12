@@ -6,6 +6,20 @@ let currentJournalId = null;
 let initialLoad = true;
 
 async function renderJournalViewPage() {
+  // CRITICAL: Clear any existing timers to prevent duplicate operations
+  if (autoSaveTimer) {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = null;
+  }
+  if (autoAnalyzeTimer) {
+    clearTimeout(autoAnalyzeTimer);
+    autoAnalyzeTimer = null;
+  }
+  
+  // Reset state for new page load
+  hasUnsavedChanges = false;
+  initialLoad = true;
+  
   const params = getRouteParams();
   const journalId = params.id;
   currentJournalId = journalId;
@@ -48,13 +62,27 @@ async function renderJournalViewPage() {
     </div>
   `;
 
-  const titleInput = document.getElementById('title-input');
-  const contentInput = document.getElementById('content-input');
-  const saveBtn = document.getElementById('save-btn');
+  let titleInput = document.getElementById('title-input');
+  let contentInput = document.getElementById('content-input');
+  let saveBtn = document.getElementById('save-btn');
   const saveStatus = document.getElementById('save-status');
   const messageArea = document.getElementById('message-area');
   const analysisSection = document.getElementById('analysis-section');
   const calendarStatus = document.getElementById('calendar-status');
+
+  // CRITICAL FIX: Clone elements to remove ALL old event listeners
+  const newTitleInput = titleInput.cloneNode(true);
+  const newContentInput = contentInput.cloneNode(true);
+  const newSaveBtn = saveBtn.cloneNode(true);
+  
+  titleInput.parentNode.replaceChild(newTitleInput, titleInput);
+  contentInput.parentNode.replaceChild(newContentInput, contentInput);
+  saveBtn.parentNode.replaceChild(newSaveBtn, saveBtn);
+  
+  // Update references to use the clean cloned elements
+  titleInput = newTitleInput;
+  contentInput = newContentInput;
+  saveBtn = newSaveBtn;
 
   // Load existing journal if not new
   if (!isNew) {
@@ -132,14 +160,15 @@ async function renderJournalViewPage() {
 
     console.log('🎯 Setting up auto-save listeners');
     
-    titleInput.addEventListener('input', () => {
+    // Add fresh event listeners to cloned elements (no need to remove - elements are brand new)
+    titleInput.addEventListener('input', function handleTitleInput() {
       console.log('📝 Title changed - auto-save in 2s');
       hasUnsavedChanges = true;
       clearTimeout(autoSaveTimer);
       autoSaveTimer = setTimeout(autoSave, 2000);
     });
 
-    contentInput.addEventListener('input', () => {
+    contentInput.addEventListener('input', function handleContentInput() {
       console.log('📝 Content changed - auto-save in 2s, auto-analyze in 5s');
       hasUnsavedChanges = true;
       clearTimeout(autoSaveTimer);
@@ -339,8 +368,8 @@ async function renderJournalViewPage() {
     setTimeout(() => messageArea.innerHTML = '', 5000);
   }
 
-  // Manual save button
-  saveBtn.addEventListener('click', async () => {
+  // Manual save button - add fresh event listener to cloned element
+  async function handleSaveClick() {
     if (!contentInput.value.trim()) {
       showMessage('Please write something first', 'error');
       return;
@@ -376,11 +405,21 @@ async function renderJournalViewPage() {
       saveBtn.disabled = false;
       saveBtn.textContent = 'Save Journal';
     }
-  });
+  }
 
-  // Delete button
+  // Add fresh event listener to cloned element
+  saveBtn.addEventListener('click', handleSaveClick);
+
+  // Delete button - clone to remove ALL old event listeners
   if (!isNew) {
-    document.getElementById('delete-btn').addEventListener('click', async () => {
+    let deleteBtn = document.getElementById('delete-btn');
+    
+    // Clone to remove all old listeners
+    const newDeleteBtn = deleteBtn.cloneNode(true);
+    deleteBtn.parentNode.replaceChild(newDeleteBtn, deleteBtn);
+    deleteBtn = newDeleteBtn;
+    
+    async function handleDeleteClick() {
       if (!confirm('Are you sure you want to delete this journal?')) return;
 
       try {
@@ -391,7 +430,10 @@ async function renderJournalViewPage() {
       } catch (error) {
         showMessage('Failed to delete journal', 'error');
       }
-    });
+    }
+
+    // Add fresh event listener to cloned element
+    deleteBtn.addEventListener('click', handleDeleteClick);
   }
 
   // Setup auto-save

@@ -27,6 +27,11 @@
     "openai": "^6.8.1"
   },
   "devDependencies": {
+<<<<<<< HEAD
     "nodemon": "^3.1.10"
+=======
+    "axios": "^1.13.2",
+    "nodemon": "^3.0.1"
+>>>>>>> 4958ca8449ec525e57dde45004b15373cb1220f7
   }
 }

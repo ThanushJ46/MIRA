@@ -224,34 +224,91 @@ const analyzeJournal = async (req, res) => {
       });
     }
 
-    // ⚡ SPEED OPTIMIZATION: Run both Ollama calls in parallel instead of sequential
-    // This cuts analysis time almost in half!
-    const [aiAnalysis, detectedEvents] = await Promise.all([
+    // ⚡ SPEED OPTIMIZATION: Run AI analysis, event detection, AND history fetch in parallel
+    // This maximizes efficiency and cuts analysis time significantly!
+    console.log('📚 Fetching user history and running AI analysis in parallel...');
+    
+    const [aiAnalysis, detectedEvents, recentJournals, existingReminders] = await Promise.all([
       analyzeJournalWithLlama(content),
-      detectEventsWithLlama(content)
+      detectEventsWithLlama(content),
+      Journal.find({ 
+          userId: req.userId,
+          _id: { $ne: req.params.id } // Exclude current journal from history
+        })
+        .sort({ date: -1 })
+        .limit(5)
+        .select('content date')
+        .catch(err => {
+          console.error('Failed to fetch recent journals:', err.message);
+          return []; // Graceful fallback
+        }),
+      Reminder.find({ 
+          userId: req.userId
+          // INCLUDE reminders from current journal to prevent duplicates on re-analysis
+        })
+        .sort({ eventDate: -1 })
+        .limit(20) // Increased limit to catch more potential duplicates
+        .select('title eventDate status journalId')
+        .catch(err => {
+          console.error('Failed to fetch existing reminders:', err.message);
+          return []; // Graceful fallback
+        })
     ]);
+
+    console.log(`📖 Loaded ${recentJournals.length} recent journals and ${existingReminders.length} existing reminders`);
 
     // 🤖 AGENTIC AI: Let AI intelligently decide which reminders to create
     let createdReminders = [];
     let syncResults = [];
+    let aiAgentResponse = null;
     
     if (detectedEvents && detectedEvents.length > 0) {
       console.log(`🤖 AI Agent: Detected ${detectedEvents.length} potential events`);
       
-      // NEW: AI makes intelligent decisions about reminder creation
-      const aiReminders = await createRemindersWithAI(detectedEvents, content);
-      console.log(`🤖 AI Agent: Approved ${aiReminders.length} reminders for creation`);
+      // Build user history context
+      const userHistory = {
+        recentJournals: recentJournals || [],
+        existingReminders: existingReminders || []
+      };
+      
+      // NEW: AI makes intelligent decisions WITH MEMORY
+      const aiDecision = await createRemindersWithAI(detectedEvents, content, userHistory);
+      const aiReminders = aiDecision.reminders || [];
+      aiAgentResponse = {
+        message: aiDecision.aiResponse,
+        reasoning: aiDecision.reasoning,
+        approved: aiDecision.approved,
+        rejected: aiDecision.rejected
+      };
+      
+      console.log(`🤖 AI Agent Decision: Approved ${aiReminders.length} reminders`);
+      console.log(`💬 AI Says: "${aiDecision.aiResponse}"`);
       
       if (aiReminders.length > 0) {
         // Save AI-approved reminders to database
         for (const reminderData of aiReminders) {
           try {
+            // 🛡️ VALIDATION: Ensure eventDate is valid before creating reminder
+            const eventDate = new Date(reminderData.eventDate);
+            
+            // Check if date is valid and in the future
+            if (isNaN(eventDate.getTime())) {
+              console.error(`⚠️ Invalid date for reminder "${reminderData.title}": ${reminderData.eventDate}`);
+              continue; // Skip this reminder
+            }
+            
+            const now = new Date();
+            if (eventDate < now) {
+              console.warn(`⏰ Event date in the past for "${reminderData.title}", skipping`);
+              continue; // Skip past events
+            }
+            
             const reminder = await Reminder.create({
               userId: req.userId,
               journalId: req.params.id,
-              title: reminderData.title,
-              description: reminderData.description,
-              eventDate: reminderData.eventDate,
+              title: reminderData.title || 'Untitled Reminder',
+              description: reminderData.description || '',
+              eventDate: eventDate,
               originalSentence: reminderData.originalSentence || reminderData.aiMetadata?.reasoning || '',
               status: 'confirmed' // AI auto-confirms
             });
@@ -278,6 +335,15 @@ const analyzeJournal = async (req, res) => {
           }
         }
       }
+    } else if (detectedEvents && detectedEvents.length === 0) {
+      // No events detected - still provide AI response
+      aiAgentResponse = {
+        message: 'No upcoming events or appointments detected in this journal.',
+        reasoning: 'Event detection found no future commitments.',
+        approved: 0,
+        rejected: 0
+      };
+      console.log('ℹ️ No events detected - AI response set to inform user');
     }
 
     // Combine analysis with detected events
@@ -291,7 +357,8 @@ const analyzeJournal = async (req, res) => {
       detectedEvents: detectedEvents,
       aiRemindersCreated: createdReminders.length, // AI-approved and created
       autoSyncedToCalendar: syncResults.filter(r => r.synced).length, // Count synced
-      aiDecisionMaking: true // Flag indicating AI made autonomous decisions
+      aiDecisionMaking: true, // Flag indicating AI made autonomous decisions
+      aiAgentResponse: aiAgentResponse // AI's response to user about reminder decisions
     };
 
     // Save analysis to journal
@@ -300,7 +367,7 @@ const analyzeJournal = async (req, res) => {
     journal.analysisAt = Date.now();
     await journal.save();
 
-    // Enhanced success message
+    // Enhanced success message with AI response
     let message = "Journal analyzed successfully with AI";
     if (createdReminders.length > 0) {
       const syncedCount = syncResults.filter(r => r.synced).length;
@@ -309,6 +376,11 @@ const analyzeJournal = async (req, res) => {
       } else {
         message += ` • AI created ${createdReminders.length} reminder(s)`;
       }
+    }
+    
+    // Add AI's message to user
+    if (aiAgentResponse && aiAgentResponse.message) {
+      message += ` • AI: "${aiAgentResponse.message}"`;
     }
 
     return res.json({ 
