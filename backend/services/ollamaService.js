@@ -369,67 +369,166 @@ async function checkOllamaAvailability() {
 /**
  * AI Agent: Intelligently decide which reminders to create and how to structure them
  * This is TRUE AGENTIC AI - the AI makes autonomous decisions about reminder creation
+ * NOW WITH MEMORY: AI considers user's previous journals and reminders
  * @param {Array} detectedEvents - Events detected from journal
  * @param {string} journalContent - Original journal content for context
- * @returns {Promise<Array>} - AI-generated reminder objects ready for database
+ * @param {Object} userHistory - User's previous journals and reminders for context
+ * @returns {Promise<Object>} - AI decision with reminders and reasoning
  */
-async function createRemindersWithAI(detectedEvents, journalContent) {
+async function createRemindersWithAI(detectedEvents, journalContent, userHistory = {}) {
   try {
     if (!detectedEvents || detectedEvents.length === 0) {
       console.log('ℹ️ No events to analyze for reminder creation');
-      return [];
+      return {
+        reminders: [],
+        aiResponse: 'No events detected in this journal entry.',
+        reasoning: 'Event detection found no future commitments or appointments.'
+      };
     }
 
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('🤖 AGENTIC AI REMINDER CREATION STARTED');
+    console.log('🤖 AGENTIC AI WITH MEMORY - REMINDER CREATION');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log(`📥 Input: ${detectedEvents.length} detected events`);
-    console.log('📋 Events to analyze:', JSON.stringify(detectedEvents.map(e => ({
-      title: e.title,
-      date: e.date,
-      type: e.type
-    })), null, 2));
-    console.log('🧠 Sending to Llama3 AI for intelligent decision-making...');
+    console.log(`🧠 User Context: ${userHistory.recentJournals?.length || 0} recent journals, ${userHistory.existingReminders?.length || 0} existing reminders`);
+    console.log('📋 Events to analyze:', JSON.stringify(detectedEvents.map(e => {
+      const eventDate = new Date(e.date);
+      const dateOnly = eventDate.toISOString().split('T')[0]; // YYYY-MM-DD
+      return {
+        title: e.title,
+        dateOnly: dateOnly,
+        fullDate: e.date,
+        type: e.type
+      };
+    }), null, 2));
+    console.log('🧠 Sending to Llama3 AI with user history for intelligent decision-making...');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-    const prompt = `You are an intelligent reminder creation agent. Analyze these detected events and decide which ones should become reminders.
+    // Build context from user's history
+    const recentJournalsContext = userHistory.recentJournals?.length > 0
+      ? `\nRECENT JOURNALS (last ${userHistory.recentJournals.length}):\n` + 
+        userHistory.recentJournals.map((j, i) => 
+          `${i + 1}. [${new Date(j.date).toLocaleDateString()}] ${j.content.substring(0, 150)}...`
+        ).join('\n')
+      : '\nNo previous journals available.';
 
-DETECTED EVENTS:
-${JSON.stringify(detectedEvents, null, 2)}
+    const existingRemindersContext = userHistory.existingReminders?.length > 0
+      ? `\nEXISTING REMINDERS (DO NOT CREATE DUPLICATES!):\n` + 
+        userHistory.existingReminders.map((r, i) => {
+          const eventDate = new Date(r.eventDate);
+          const dateOnly = eventDate.toISOString().split('T')[0]; // YYYY-MM-DD only
+          const timeStr = eventDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+          return `${i + 1}. "${r.title}" on ${dateOnly} (${eventDate.toLocaleDateString()}) at ${timeStr} [Status: ${r.status}]`;
+        }).join('\n')
+      : '\nNo existing reminders.';
 
-JOURNAL CONTEXT:
-${journalContent.substring(0, 500)}
+    const prompt = `You are an intelligent AI agent managing a user's personal journal and reminders. You have access to their history and must make autonomous decisions about reminder creation.
 
-YOUR TASK:
-Analyze each event and decide if it needs a reminder. For approved events, create enhanced reminder objects.
+USER'S HISTORY:
+${recentJournalsContext}
+${existingRemindersContext}
 
-DECISION RULES:
-✓ CREATE if: Appointment, deadline, meeting, important commitment
-✗ SKIP if: Casual mention, vague idea, already passed, uncertain ("maybe", "might")
+CURRENT JOURNAL ENTRY:
+${journalContent}
 
-OUTPUT FORMAT (MUST BE VALID JSON ARRAY):
-[
-  {
-    "title": "Event name",
-    "description": "Context from journal + preparation notes",
-    "eventDate": "YYYY-MM-DDTHH:mm:ss.sssZ",
-    "shouldCreate": true,
-    "priority": "high",
-    "aiReasoning": "Why this needs a reminder",
-    "preparationNotes": "What to prepare"
-  }
-]
+DETECTED EVENTS IN THIS ENTRY (with dates for comparison):
+${JSON.stringify(detectedEvents.map(e => {
+  const eventDate = new Date(e.date);
+  const dateOnly = eventDate.toISOString().split('T')[0]; // YYYY-MM-DD for easy comparison
+  return {
+    title: e.title,
+    dateOnly: dateOnly,
+    fullDateTime: e.date,
+    context: e.sentence,
+    type: e.type
+  };
+}), null, 2)}
+
+YOUR TASK AS AN AGENTIC AI:
+1. **CRITICAL FIRST STEP: Check for duplicates** - Compare each detected event with EXISTING REMINDERS
+   - Extract date-only (YYYY-MM-DD) from both detected events and existing reminders
+   - Compare titles (case-insensitive, semantic similarity)
+   - If title is similar AND date (YYYY-MM-DD) matches = DUPLICATE → set shouldCreate: false
+   - IGNORE time differences when comparing (9am vs 3pm on same day = SAME EVENT!)
+2. Analyze the detected events in context of user's history
+3. Understand user's patterns (do they follow through? do they need more structure?)
+4. Decide autonomously which events truly need reminders
+5. Provide reasoning for your decisions that will be shown to the user
+
+DECISION CRITERIA:
+✓ CREATE (shouldCreate: true) if: 
+  - Important deadline, appointment, or commitment
+  - **NOT already in existing reminders** (check titles and dates carefully!)
+  - User historically benefits from such reminders
+  
+✗ SKIP (shouldCreate: false) if: 
+  - **DUPLICATE of existing reminder** (same event title or same date)
+  - Casual mention ("maybe", "might", "thinking about")
+  - Already passed
+  - Too vague or uncertain
+
+DUPLICATE DETECTION RULES (CRITICAL - READ CAREFULLY):
+- Compare event titles (case-insensitive, ignore minor wording differences)
+- Compare dates ONLY (Year-Month-Day), IGNORE time differences!
+- "Client demo" on Nov 25 at 3pm is DUPLICATE of "Client demo" on Nov 25 at 9am (SAME DAY!)
+- "Dentist appointment on Nov 19" is DUPLICATE of reminder "Dentist" or "Dentist appointment" on Nov 19
+- "Team meeting tomorrow" is DUPLICATE if reminder "Team meeting" or "Standup meeting" exists for tomorrow
+- Semantically similar titles on same date = DUPLICATE (e.g., "dentist" and "dental appointment")
+- When in doubt about duplicates, set shouldCreate: false
+
+EXAMPLES:
+Example 1 - DUPLICATE (same title, same day, different times):
+  Detected: "Client demo" on 2025-11-25T09:00:00.000Z (9am)
+  Existing: "Client demo" on 2025-11-25T15:00:00.000Z (3pm)
+  Decision: shouldCreate: false (DUPLICATE - same title, same DATE, ignore time difference!)
+  
+Example 2 - DUPLICATE (similar titles, same day):
+  Detected: "Dentist" on 2025-11-19T14:00:00.000Z
+  Existing: "Dentist appointment" on 2025-11-19T10:00:00.000Z
+  Decision: shouldCreate: false (DUPLICATE - same event, same day)
+  
+Example 3 - NEW EVENT (different event):
+  Detected: "Team standup" on 2025-11-15
+  Existing: "Dentist appointment" on 2025-11-19
+  Decision: shouldCreate: true (Different event)
+  
+Example 4 - NEW EVENT (same title, different month):
+  Detected: "Dentist appointment" on 2025-12-19
+  Existing: "Dentist appointment" on 2025-11-19
+  Decision: shouldCreate: true (Same title but different month - likely a follow-up)
+  
+Example 5 - DUPLICATE (semantically similar):
+  Detected: "Standup meeting" on 2025-11-15
+  Existing: "Team standup" on 2025-11-15
+  Decision: shouldCreate: false (DUPLICATE - same type of event, same day)
+
+OUTPUT FORMAT (MUST BE VALID JSON):
+{
+  "reminders": [
+    {
+      "title": "Clear event name",
+      "description": "Context + what to prepare (reference their history if relevant)",
+      "eventDate": "YYYY-MM-DDTHH:mm:ss.sssZ",
+      "shouldCreate": true,
+      "priority": "high/medium/low",
+      "aiReasoning": "Why this needs a reminder (mention patterns from history if relevant)"
+    }
+  ],
+  "aiResponse": "A friendly message to the user explaining your decisions",
+  "reasoning": "Overall reasoning about the reminder creation process"
+}
 
 CRITICAL RULES:
-1. Return ONLY valid JSON array (no markdown, no explanations)
-2. Only include events where shouldCreate is true
-3. Use exact ISO date from detected event
-4. Be selective - quality over quantity
-5. Empty array [] if no events deserve reminders
+1. Return ONLY valid JSON object (no markdown, no explanations outside JSON)
+2. Only include reminders where shouldCreate is true
+3. Use exact ISO dates from detected events
+4. Reference user's history in your reasoning when relevant
+5. Be autonomous - make decisions confidently
+6. The aiResponse will be shown to the user, so be helpful and clear
 
-Respond with JSON array only:`;
+Respond with JSON only:`;
 
-    console.log('⏳ Waiting for Llama3 AI response...');
+    console.log('⏳ Waiting for Llama3 AI to analyze with full context...');
     
     const response = await ollama.chat({
       model: 'llama3',
@@ -437,8 +536,8 @@ Respond with JSON array only:`;
       stream: false,
       format: 'json',
       options: {
-        temperature: 0.2, // Lower temperature for more consistent output
-        num_predict: 1000, // Limit response length
+        temperature: 0.3, // Slightly higher for more contextual reasoning
+        num_predict: 1500, // More tokens for reasoning
       }
     });
 
@@ -460,65 +559,85 @@ Respond with JSON array only:`;
     }
 
     // Try to parse JSON
-    let aiReminders;
+    let aiDecision;
     try {
-      aiReminders = JSON.parse(jsonString);
+      aiDecision = JSON.parse(jsonString);
     } catch (parseError) {
       console.error('❌ JSON parse error:', parseError.message);
-      console.error('Failed JSON string:', jsonString.substring(0, 300));
+      console.error('Failed JSON string (first 300 chars):', jsonString.substring(0, 300));
       
-      // Fallback: Create basic reminders from all detected events
+      // Fallback: Create basic response with proper structure
       console.log('⚠️ Falling back to basic reminder creation');
-      return detectedEvents.map(event => ({
-        title: event.title,
-        description: event.description || event.sentence || 'Event from journal',
-        eventDate: new Date(event.date),
-        originalSentence: event.sentence || ''
-      }));
+      return {
+        reminders: detectedEvents.map(event => ({
+          title: event.title || 'Untitled Event',
+          description: event.description || event.sentence || 'Event from journal',
+          eventDate: event.date, // Already in ISO format from detectEventsWithLlama
+          originalSentence: event.sentence || '',
+          aiMetadata: {
+            priority: 'medium',
+            reasoning: 'Auto-created due to AI parsing error'
+          }
+        })),
+        aiResponse: `I detected ${detectedEvents.length} event(s) and created reminders. (Note: AI analysis encountered a parsing error, so I created basic reminders.)`,
+        reasoning: 'AI parsing encountered an error, created reminders for all detected events as a fallback.',
+        approved: detectedEvents.length,
+        rejected: 0
+      };
     }
     
-    // Validate response is an array
-    if (!Array.isArray(aiReminders)) {
-      console.error('❌ AI returned non-array response:', typeof aiReminders);
-      console.error('Response structure:', JSON.stringify(aiReminders).substring(0, 200));
+    // Validate response structure
+    if (!aiDecision.reminders || !Array.isArray(aiDecision.reminders)) {
+      console.error('❌ AI returned invalid structure:', typeof aiDecision);
       
-      // Check if it's wrapped in an object with a key
-      if (aiReminders && typeof aiReminders === 'object') {
-        // Try common wrapper keys
+      // Try to find reminders array in nested structure
+      if (aiDecision && typeof aiDecision === 'object') {
         const possibleKeys = ['reminders', 'events', 'items', 'data', 'results'];
         for (const key of possibleKeys) {
-          if (Array.isArray(aiReminders[key])) {
-            console.log(`✅ Found array under key "${key}"`);
-            aiReminders = aiReminders[key];
+          if (Array.isArray(aiDecision[key])) {
+            console.log(`✅ Found reminders array under key "${key}"`);
+            aiDecision.reminders = aiDecision[key];
             break;
           }
         }
       }
       
-      // If still not an array, fallback
-      if (!Array.isArray(aiReminders)) {
-        console.log('⚠️ Falling back to basic reminder creation');
-        return detectedEvents.map(event => ({
-          title: event.title,
-          description: event.description || event.sentence || 'Event from journal',
-          eventDate: new Date(event.date),
-          originalSentence: event.sentence || ''
-        }));
+      // If still invalid, fallback
+      if (!Array.isArray(aiDecision.reminders)) {
+        console.log('⚠️ Falling back to basic reminder creation (invalid structure)');
+        return {
+          reminders: detectedEvents.map(event => ({
+            title: event.title || 'Untitled Event',
+            description: event.description || event.sentence || 'Event from journal',
+            eventDate: event.date, // Already in ISO format from detectEventsWithLlama
+            originalSentence: event.sentence || '',
+            aiMetadata: {
+              priority: 'medium',
+              reasoning: 'Auto-created due to AI structure error'
+            }
+          })),
+          aiResponse: `I detected ${detectedEvents.length} event(s) and created reminders. (Note: AI returned invalid structure, so I created basic reminders.)`,
+          reasoning: 'AI response structure was invalid, created reminders for all detected events as a fallback.',
+          approved: detectedEvents.length,
+          rejected: 0
+        };
       }
     }
 
     // Filter: Only keep reminders where AI decided shouldCreate is true
-    const approvedReminders = aiReminders.filter(reminder => reminder.shouldCreate === true);
+    const approvedReminders = aiDecision.reminders.filter(reminder => reminder.shouldCreate === true);
 
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('🤖 AI DECISION COMPLETE');
+    console.log('🤖 AI DECISION COMPLETE (WITH MEMORY)');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log(`📊 AI analyzed: ${detectedEvents.length} events`);
     console.log(`✅ AI approved: ${approvedReminders.length} reminders`);
     console.log(`❌ AI rejected: ${detectedEvents.length - approvedReminders.length} events`);
+    console.log(`💬 AI Response to User: "${aiDecision.aiResponse}"`);
+    console.log(`🧠 AI Reasoning: "${aiDecision.reasoning}"`);
     
     if (approvedReminders.length > 0) {
-      console.log('\n📝 AI-APPROVED REMINDERS:');
+      console.log('\n📝 AI-APPROVED REMINDERS (with context):');
       approvedReminders.forEach((reminder, index) => {
         console.log(`\n${index + 1}. "${reminder.title}"`);
         console.log(`   📅 Date: ${reminder.eventDate}`);
@@ -528,38 +647,58 @@ Respond with JSON array only:`;
     }
 
     if (approvedReminders.length === 0) {
-      console.log('ℹ️ AI decided NO events need reminders (all were casual mentions or uncertain)');
+      console.log('ℹ️ AI decided NO events need reminders');
+      console.log(`   Reason: ${aiDecision.reasoning}`);
     }
     
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('✨ This was 100% AI decision-making, not backend code!');
+    console.log('✨ AI made autonomous decisions based on user history!');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-    // Transform AI response into database-ready format
-    return approvedReminders.map(reminder => ({
+    // Transform AI reminders into database-ready format
+    const remindersForDB = approvedReminders.map(reminder => ({
       title: reminder.title,
-      description: reminder.description || reminder.preparationNotes || '',
+      description: reminder.description || '',
       eventDate: new Date(reminder.eventDate),
       originalSentence: reminder.aiReasoning || '',
       aiMetadata: {
         priority: reminder.priority || 'medium',
         reasoning: reminder.aiReasoning,
-        preparationNotes: reminder.preparationNotes
+        preparationNotes: reminder.preparationNotes || reminder.description
       }
     }));
+
+    // Return both reminders AND AI's response/reasoning for frontend
+    return {
+      reminders: remindersForDB,
+      aiResponse: aiDecision.aiResponse || 'I analyzed the events and created reminders based on your history.',
+      reasoning: aiDecision.reasoning || 'Created reminders for important commitments.',
+      approved: approvedReminders.length,
+      rejected: detectedEvents.length - approvedReminders.length
+    };
 
   } catch (error) {
     console.error('❌ AI reminder creation error:', error);
     console.error('Error stack:', error.stack);
     
-    // Fallback: Create basic reminders from detected events
+    // Fallback: Create basic reminders with proper structure
     console.log('⚠️ Error fallback: Creating basic reminders from all detected events');
-    return detectedEvents.map(event => ({
-      title: event.title,
-      description: event.description || event.sentence || '',
-      eventDate: new Date(event.date),
-      originalSentence: event.sentence || ''
-    }));
+    return {
+      reminders: detectedEvents.map(event => ({
+        title: event.title || 'Untitled Event',
+        description: event.description || event.sentence || 'Event from journal',
+        eventDate: event.date, // Already in ISO format
+        originalSentence: event.sentence || '',
+        aiMetadata: {
+          priority: 'medium',
+          reasoning: 'Auto-created due to unexpected AI error'
+        }
+      })),
+      aiResponse: `I encountered an error but created ${detectedEvents.length} reminder(s) for the events I detected.`,
+      reasoning: 'Fallback mode due to unexpected AI error.',
+      approved: detectedEvents.length,
+      rejected: 0
+    };
   }
 }
 
